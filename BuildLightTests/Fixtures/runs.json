@@ -1,0 +1,44 @@
+{
+  "total_count": 2,
+  "workflow_runs": [
+    {
+      "id": 15900000001,
+      "name": "iOS Build",
+      "head_branch": "feat/beta-absorb-dev-subagent-and-send-fix",
+      "head_sha": "b2f13f1a0000000000000000000000000000abcd",
+      "display_title": "回底按钮·键盘往返修复·门禁适配",
+      "run_number": 613,
+      "event": "workflow_dispatch",
+      "status": "in_progress",
+      "conclusion": null,
+      "created_at": "2026-10-27T16:41:12Z",
+      "run_started_at": "2026-10-27T16:41:38Z",
+      "updated_at": "2026-10-27T16:45:24Z",
+      "html_url": "https://github.com/chenyynx/Agents-Anywhere/actions/runs/15900000001",
+      "workflow_id": 99001,
+      "run_attempt": 1,
+      "actor": {
+        "login": "chenyynx",
+        "avatar_url": "https://avatars.githubusercontent.com/u/1?v=4"
+      }
+    },
+    {
+      "id": 15900000002,
+      "name": "iOS Build",
+      "head_branch": "main",
+      "head_sha": "f2670670000000000000000000000000000abcde",
+      "display_title": "build 29",
+      "run_number": 88,
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T16:20:00Z",
+      "run_started_at": "2026-10-27T16:20:09Z",
+      "updated_at": "2026-10-27T16:26:22Z",
+      "html_url": "https://github.com/chenyynx/claudio/actions/runs/15900000002",
+      "workflow_id": 99002,
+      "run_attempt": 1,
+      "actor": null
+    }
+  ]
+}

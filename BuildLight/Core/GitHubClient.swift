@@ -73,13 +73,15 @@ actor GitHubClient {
         self.decoder = GitHubJSON.makeDecoder()
     }
 
-    static let iso8601: ISO8601DateFormatter = {
+    // ISO8601DateFormatter 配置完成后只读、解析线程安全；
+    // Swift 6 的 Sendable 检查不认这一点，这里显式放行。
+    nonisolated(unsafe) static let iso8601: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime]
         return f
     }()
 
-    static let iso8601WithFraction: ISO8601DateFormatter = {
+    nonisolated(unsafe) static let iso8601WithFraction: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return f

@@ -24,6 +24,7 @@ struct RootTabView: View {
                 NavigationStack { SettingsView() }
             }
         }
-        .tabBarMinimizeBehavior(.onScrollDown)
+        // tabBarMinimizeBehavior 在当前 SDK 里还不可用，等 Xcode 升级后再加。
+        // 原生 TabView 本身在 iOS 26 就是浮动玻璃形态，不需要自己实现。
     }
 }

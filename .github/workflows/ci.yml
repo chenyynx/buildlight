@@ -6,11 +6,20 @@ on:
   pull_request:
   workflow_dispatch:
 
+# 连续 push 时取消上一轮，避免排队堆积
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
+
 jobs:
-  test:
-    name: 单元测试
+  # 1) 只编译：最快的反馈，编不过就不用往下走了
+  build:
+    name: 编译
     runs-on: macos-15
-    timeout-minutes: 40
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -27,22 +36,93 @@ jobs:
           sudo xcode-select -s "$CANDIDATE"
           xcodebuild -version
 
-      - name: 运行测试
+      - name: 缓存 SPM 依赖
+        uses: actions/cache@v4
+        with:
+          path: .spm
+          key: spm-${{ runner.os }}-${{ hashFiles('project.yml') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      - name: 编译（真机架构，不签名）
         run: |
           set -o pipefail
-          DEST=$(xcrun simctl list devices available | grep -m1 -E "iPhone" | sed -E 's/^[[:space:]]*([^(]+) \(([0-9A-F-]+)\).*/\1/')
-          if [ -z "$DEST" ]; then
-            xcrun simctl list devices available
-            exit 1
+          xcodebuild build \
+            -project BuildLight.xcodeproj \
+            -scheme BuildLight \
+            -configuration Debug \
+            -destination 'generic/platform=iOS' \
+            -clonedSourcePackagesDirPath .spm \
+            -derivedDataPath .build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            2>&1 | tee /tmp/build.log | tail -80
+
+      - name: 失败时上传日志
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: /tmp/build.log
+          retention-days: 5
+
+  # 2) 单元测试：并行跑，慢也不挡出包
+  test:
+    name: 单元测试
+    needs: build
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 XcodeGen
+        run: brew install xcodegen
+
+      - name: 生成工程
+        run: xcodegen generate
+
+      - name: 选择最新 Xcode
+        run: |
+          CANDIDATE=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          sudo xcode-select -s "$CANDIDATE"
+
+      - name: 缓存 SPM 依赖
+        uses: actions/cache@v4
+        with:
+          path: .spm
+          key: spm-${{ runner.os }}-${{ hashFiles('project.yml') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      - name: 运行测试（固定设备 id，避免双架构重复编译）
+        run: |
+          set -o pipefail
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          data = json.load(sys.stdin)["devices"]
+          best = None
+          for runtime, devices in data.items():
+              if "iOS" not in runtime:
+                  continue
+              for d in devices:
+                  if d.get("isAvailable") and "iPhone" in d.get("name", ""):
+                      best = d["udid"]
+                      break
+              if best:
+                  break
+          print(best or "")
+          ')
+          if [ -z "$UDID" ]; then
+            echo "没有可用模拟器"; xcrun simctl list devices available; exit 1
           fi
-          echo "使用模拟器: $DEST"
+          echo "模拟器 UDID: $UDID"
           xcodebuild test \
             -project BuildLight.xcodeproj \
             -scheme BuildLight \
-            -destination "platform=iOS Simulator,name=$DEST" \
-            -derivedDataPath .build \
+            -destination "platform=iOS Simulator,id=$UDID" \
+            -clonedSourcePackagesDirPath .spm \
+            -derivedDataPath .build-test \
+            -parallel-testing-enabled NO \
             CODE_SIGNING_ALLOWED=NO \
-            | tee /tmp/test.log | tail -60
+            2>&1 | tee /tmp/test.log | tail -60
 
       - name: 上传测试日志
         if: always()
@@ -50,13 +130,14 @@ jobs:
         with:
           name: test-log
           path: /tmp/test.log
-          retention-days: 7
+          retention-days: 5
 
+  # 3) 出包：只依赖编译，测试慢也不拖住
   ipa:
     name: 无签名 IPA
-    needs: test
+    needs: build
     runs-on: macos-15
-    timeout-minutes: 60
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -69,11 +150,16 @@ jobs:
       - name: 选择最新 Xcode
         run: |
           CANDIDATE=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
-          echo "使用 $CANDIDATE"
           sudo xcode-select -s "$CANDIDATE"
-          xcodebuild -version
 
-      - name: 编译真机包（未签名）
+      - name: 缓存 SPM 依赖
+        uses: actions/cache@v4
+        with:
+          path: .spm
+          key: spm-${{ runner.os }}-${{ hashFiles('project.yml') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      - name: 编译 Release
         run: |
           set -o pipefail
           xcodebuild build \
@@ -81,17 +167,18 @@ jobs:
             -scheme BuildLight \
             -configuration Release \
             -destination 'generic/platform=iOS' \
-            -derivedDataPath .build \
+            -clonedSourcePackagesDirPath .spm \
+            -derivedDataPath .build-release \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGN_ENTITLEMENTS="" \
-            | tee /tmp/build.log | tail -40
+            2>&1 | tee /tmp/release.log | tail -40
 
       - name: 打包 IPA
         run: |
           set -euo pipefail
-          APP=$(find .build/Build/Products/Release-iphoneos -maxdepth 1 -name "*.app" | head -1)
+          APP=$(find .build-release/Build/Products/Release-iphoneos -maxdepth 1 -name "*.app" | head -1)
           echo "app: $APP"
           rm -rf /tmp/ipa && mkdir -p /tmp/ipa/Payload
           cp -R "$APP" /tmp/ipa/Payload/
@@ -106,11 +193,11 @@ jobs:
           path: /tmp/ipa/BuildLight-unsigned.ipa
           retention-days: 30
 
-      - name: 编译失败时上传日志
+      - name: 失败时上传日志
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: build-log
-          path: /tmp/build.log
+          name: release-log
+          path: /tmp/release.log
           if-no-files-found: ignore
-          retention-days: 7
+          retention-days: 5

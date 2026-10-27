@@ -92,35 +92,21 @@ jobs:
           key: spm-${{ runner.os }}-${{ hashFiles('project.yml') }}
           restore-keys: spm-${{ runner.os }}-
 
-      - name: 运行测试（固定设备 id，避免双架构重复编译）
+      - name: 运行测试
         run: |
           set -o pipefail
-          UDID=$(xcrun simctl list devices available -j | python3 -c '
-          import json, sys
-          data = json.load(sys.stdin)["devices"]
-          best = None
-          for runtime, devices in data.items():
-              if "iOS" not in runtime:
-                  continue
-              for d in devices:
-                  if d.get("isAvailable") and "iPhone" in d.get("name", ""):
-                      best = d["udid"]
-                      break
-              if best:
-                  break
-          print(best or "")
-          ')
-          if [ -z "$UDID" ]; then
+          # 用设备名而不是 id：runner 的 id 每台机器都不同
+          DEST=$(xcrun simctl list devices available | grep -m1 -E "iPhone" | sed -E 's/^[[:space:]]*([^(]+) \(([0-9A-F-]+)\).*/\1/')
+          if [ -z "$DEST" ]; then
             echo "没有可用模拟器"; xcrun simctl list devices available; exit 1
           fi
-          echo "模拟器 UDID: $UDID"
+          echo "使用模拟器: $DEST"
           xcodebuild test \
             -project BuildLight.xcodeproj \
             -scheme BuildLight \
-            -destination "platform=iOS Simulator,id=$UDID" \
+            -destination "platform=iOS Simulator,name=$DEST" \
             -clonedSourcePackagesDirPath .spm \
             -derivedDataPath .build-test \
-            -parallel-testing-enabled NO \
             CODE_SIGNING_ALLOWED=NO \
             2>&1 | tee /tmp/test.log | tail -60
 

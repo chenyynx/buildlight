@@ -69,14 +69,10 @@ final class BuildMonitor {
             lastRefreshAt = .now
         }
 
-        await withTaskGroup(of: Void.self) { group in
-            for repo in due {
-                // 先占位，避免下一轮重复触发
-                nextPollAt[repo.fullName] = now.addingTimeInterval(activeInterval)
-                group.addTask { @MainActor [weak self] in
-                    await self?.refresh(repo: repo, client: client)
-                }
-            }
+        for repo in due {
+            // 先占位，避免下一轮重复触发；网络请求本身是并发的，这里串行的是状态收敛
+            nextPollAt[repo.fullName] = now.addingTimeInterval(activeInterval)
+            await refresh(repo: repo, client: client)
         }
     }
 
@@ -122,7 +118,8 @@ final class BuildMonitor {
             _ = filter
         }
 
-        var byID = Dictionary(uniqueKeysWithValues: repo.runs.map { ($0.id, $0) })
+        var byID: [Int: RunRecord] = [:]
+        for record in repo.runs { byID[record.id] = record }
         for run in runs {
             if let existing = byID[run.id] {
                 existing.apply(run)
@@ -147,19 +144,20 @@ final class BuildMonitor {
     private func loadArtifacts(for runs: [WorkflowRun], repo: RepoRecord, client: GitHubClient) async {
         guard !runs.isEmpty else { return }
         for run in runs {
-            guard let artifacts = try? await client.artifacts(owner: repo.owner, repo: repo.name, runID: run.id) else {
+            let runID = run.id
+            guard let artifacts = try? await client.artifacts(owner: repo.owner, repo: repo.name, runID: runID) else {
                 continue
             }
             let existingIDs = Set(
                 ((try? context.fetch(
-                    FetchDescriptor<ArtifactRecord>(predicate: #Predicate { $0.runID == run.id })
+                    FetchDescriptor<ArtifactRecord>(predicate: #Predicate { $0.runID == runID })
                 )) ?? []).map(\.id)
             )
-            let runRecord = try? context.fetch(
-                FetchDescriptor<RunRecord>(predicate: #Predicate { $0.id == run.id })
-            ).first
+            let runRecord = (try? context.fetch(
+                FetchDescriptor<RunRecord>(predicate: #Predicate { $0.id == runID })
+            ))?.first
             for artifact in artifacts where !existingIDs.contains(artifact.id) {
-                let record = ArtifactRecord(from: artifact, runID: run.id)
+                let record = ArtifactRecord(from: artifact, runID: runID)
                 record.run = runRecord
                 context.insert(record)
             }

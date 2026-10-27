@@ -56,7 +56,7 @@ enum AppError: LocalizedError, Equatable, Sendable {
             case .notFound: return .notFound
             case .rateLimited(let reset): return .rateLimited(resetAt: reset)
             case .decoding(let detail): return .decoding(detail)
-            case .transport: return .offline
+            case .transport(_): return .offline
             case .http(let status, _):
                 return status >= 500 ? .server(status: status) : .decoding("HTTP \(status)")
             }

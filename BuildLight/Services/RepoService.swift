@@ -41,6 +41,22 @@ final class RepoService {
         try context.save()
     }
 
+    /// 从已知的仓库信息直接入库，不再重复请求。
+    func add(_ summary: RepositorySummary) {
+        let parts = summary.fullName.split(separator: "/")
+        guard parts.count == 2 else { return }
+        let owner = String(parts[0])
+        let name = String(parts[1])
+        let existing = (try? context.fetch(
+            FetchDescriptor<RepoRecord>(predicate: #Predicate { $0.fullName == summary.fullName })
+        )) ?? []
+        guard existing.isEmpty else { return }
+        let count = (try? context.fetchCount(FetchDescriptor<RepoRecord>())) ?? 0
+        let record = RepoRecord(owner: owner, name: name, sortIndex: count)
+        context.insert(record)
+        try? context.save()
+    }
+
     func remove(_ repo: RepoRecord) {
         context.delete(repo)
         try? context.save()

@@ -3,36 +3,48 @@ import SwiftData
 
 struct RunDetailView: View {
     @Environment(AppEnvironment.self) private var environment
-    @Environment(\.colorScheme) private var colorScheme
     let run: RunRecord
 
     @State private var jobs: [WorkflowJob] = []
     @State private var loadError: AppError?
     @State private var isLoading = false
 
-    private var palette: DesignPalette { .resolve(colorScheme) }
-
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                header
-                if let loadError {
-                    errorBanner(loadError)
+        List {
+            if let loadError {
+                Section {
+                    Label(loadError.localizedDescription, systemImage: "exclamationmark.triangle")
+                        .font(.footnote)
+                        .foregroundStyle(.red)
                 }
-                ForEach(jobs) { job in
-                    jobCard(job)
-                }
-                if !run.artifacts.isEmpty {
-                    artifactSection
-                }
-                actions
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .padding(.bottom, 96)
+
+            overviewSection
+
+            ForEach(jobs) { job in
+                Section {
+                    ForEach(job.steps) { step in
+                        stepRow(step)
+                    }
+                } header: {
+                    HStack {
+                        Text(job.name)
+                        Spacer()
+                        Text(jobTime(job))
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            if !run.artifacts.isEmpty {
+                artifactsSection
+            }
+
+            actionsSection
         }
-        .scrollIndicators(.hidden)
-        .background(palette.background)
+        .listStyle(.insetGrouped)
+        .navigationTitle("#\(run.number)")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
         .task(id: run.isActive) {
@@ -42,105 +54,65 @@ struct RunDetailView: View {
                 await load()
             }
         }
+        .refreshable { await load() }
     }
 
-    // MARK: 头部
+    // MARK: 概览
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            MicroLabel(
-                text: "Run #\(run.number) · \(run.workflowName ?? "workflow")",
-                color: palette.textTertiary
-            )
-            Text(run.isActive ? "构建中" : run.conclusion.label)
-                .font(.display(33))
-                .foregroundStyle(palette.textPrimary)
-                .padding(.top, 8)
-
-            HStack(spacing: 7) {
-                chip(run.branch ?? "—", highlighted: run.isActive)
-                chip(String(run.sha.prefix(7)))
-                if let actor = run.actorLogin { chip(actor) }
-                chip(elapsedText)
+    private var overviewSection: some View {
+        Section {
+            LabeledContent("状态") {
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(statusColor)
+                        .frame(width: 7, height: 7)
+                    Text(run.isActive ? run.status.label : run.conclusion.label)
+                }
             }
-            .padding(.top, 12)
-
+            if let branch = run.branch {
+                LabeledContent("分支", value: branch)
+            }
+            LabeledContent("提交", value: String(run.sha.prefix(7)))
+            if let actor = run.actorLogin {
+                LabeledContent("触发人", value: actor)
+            }
+            LabeledContent("耗时", value: elapsedText)
             if let title = run.title, !title.isEmpty {
-                Text(title)
-                    .font(.system(size: 13))
-                    .foregroundStyle(palette.textSecondary)
-                    .lineLimit(2)
-                    .padding(.top, 12)
-            }
-        }
-    }
-
-    private func chip(_ text: String, highlighted: Bool = false) -> some View {
-        Text(text)
-            .font(.system(size: 10.5))
-            .foregroundStyle(highlighted ? palette.accentStart : palette.textSecondary)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 5)
-            .background {
-                RoundedRectangle(cornerRadius: 7)
-                    .fill(highlighted ? palette.accentStart.opacity(0.10) : palette.textPrimary.opacity(0.04))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 7)
-                            .strokeBorder(highlighted ? palette.accentStart.opacity(0.3) : palette.hairline, lineWidth: 0.5)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.subheadline)
+                    if let workflow = run.workflowName {
+                        Text(workflow)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-            }
-    }
-
-    // MARK: 任务卡
-
-    private func jobCard(_ job: WorkflowJob) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text(job.name)
-                    .font(.system(size: 13.5, weight: .semibold))
-                    .foregroundStyle(palette.textPrimary)
-                Spacer()
-                Text(jobTime(job))
-                    .font(.metric(11))
-                    .foregroundStyle(palette.textTertiary)
-            }
-            .padding(.bottom, 10)
-
-            Divider().overlay(palette.hairline)
-
-            ForEach(job.steps) { step in
-                stepRow(step)
+                }
             }
         }
-        .padding(16)
-        .background(palette.surface, in: .rect(cornerRadius: 24))
-        .overlay {
-            RoundedRectangle(cornerRadius: 24)
-                .strokeBorder(palette.hairline, lineWidth: 0.5)
-        }
     }
+
+    // MARK: 步骤
 
     private func stepRow(_ step: WorkflowStep) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
+        HStack(spacing: 10) {
             Image(systemName: iconName(for: step))
-                .font(.system(size: 10, weight: .semibold))
+                .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(iconColor(for: step))
-                .frame(width: 12)
+                .frame(width: 14)
             Text(step.name)
-                .font(.system(size: 11.5, design: .monospaced))
-                .foregroundStyle(step.status == .inProgress ? palette.textPrimary : palette.textSecondary)
+                .font(.footnote)
+                .foregroundStyle(step.status == .inProgress ? .primary : .secondary)
                 .lineLimit(1)
-            Spacer(minLength: 8)
+            Spacer(minLength: 6)
             Text(stepTime(step))
-                .font(.metric(10.5))
-                .foregroundStyle(palette.textTertiary)
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(.tertiary)
         }
-        .padding(.vertical, 8)
     }
 
     private func iconName(for step: WorkflowStep) -> String {
         switch step.status {
-        case .inProgress: return "arrowtriangle.right.fill"
+        case .inProgress: return "arrow.triangle.2.circlepath"
         case .completed:
             switch step.conclusion {
             case .success: return "checkmark"
@@ -153,45 +125,40 @@ struct RunDetailView: View {
     }
 
     private func iconColor(for step: WorkflowStep) -> Color {
-        if step.status == .inProgress { return palette.accentStart }
+        if step.status == .inProgress { return .blue }
         switch step.conclusion {
-        case .success: return palette.textTertiary
-        case .failure, .timedOut: return palette.failure
-        default: return palette.textTertiary
+        case .success: return .secondary
+        case .failure, .timedOut: return .red
+        default: return .secondary
         }
     }
 
     // MARK: 产物
 
-    private var artifactSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            MicroLabel(text: "Artifacts", color: palette.textTertiary)
+    private var artifactsSection: some View {
+        Section("构建产物") {
             ForEach(run.artifacts.sorted { $0.sizeBytes > $1.sizeBytes }) { artifact in
                 HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
+                    Image(systemName: "shippingbox")
+                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 2) {
                         Text(artifact.name)
-                            .font(.system(size: 12.5))
-                            .foregroundStyle(palette.textPrimary)
+                            .font(.subheadline)
                             .lineLimit(1)
                         Text(artifactSubtitle(artifact))
-                            .font(.system(size: 10.5))
-                            .foregroundStyle(palette.textSecondary)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 8)
                     if artifact.expired {
                         Text("已过期")
-                            .font(.system(size: 11))
-                            .foregroundStyle(palette.textTertiary)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     } else {
                         PackageButton(artifact: artifact, run: run)
                     }
                 }
-                .padding(14)
-                .background(palette.surface, in: .rect(cornerRadius: 20))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 20)
-                        .strokeBorder(palette.hairline, lineWidth: 0.5)
-                }
+                .padding(.vertical, 2)
             }
         }
     }
@@ -207,44 +174,44 @@ struct RunDetailView: View {
 
     // MARK: 操作
 
-    private var actions: some View {
-        HStack(spacing: 8) {
+    private var actionsSection: some View {
+        Section {
             Button {
                 perform {
-                    guard let client else { return }
+                    guard let client = client else { return }
                     try await client.rerun(owner: owner, repo: name, runID: run.id)
                 }
             } label: {
-                actionLabel("重跑")
+                Label("重新运行", systemImage: "arrow.clockwise")
             }
+
             if run.isActive {
-                Button {
+                Button(role: .destructive) {
                     perform {
-                    guard let client else { return }
-                    try await client.cancel(owner: owner, repo: name, runID: run.id)
-                }
+                        guard let client = client else { return }
+                        try await client.cancel(owner: owner, repo: name, runID: run.id)
+                    }
                 } label: {
-                    actionLabel("取消")
+                    Label("取消运行", systemImage: "xmark")
                 }
             }
+
             Link(destination: run.htmlURL) {
-                actionLabel("在浏览器打开")
+                Label("在浏览器中打开", systemImage: "safari")
             }
         }
-        .padding(.top, 4)
-    }
-
-    private func actionLabel(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 11.5))
-            .foregroundStyle(palette.textSecondary)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 11)
-            .background(palette.textPrimary.opacity(0.04), in: .capsule)
-            .overlay { Capsule().strokeBorder(palette.hairline, lineWidth: 0.5) }
     }
 
     // MARK: 数据
+
+    private var statusColor: Color {
+        if run.isActive { return .blue }
+        switch run.conclusion {
+        case .success: return .green
+        case .failure, .timedOut: return .red
+        default: return .secondary
+        }
+    }
 
     private var owner: String {
         run.repo?.owner ?? run.repoFullName.split(separator: "/").first.map(String.init) ?? ""
@@ -279,10 +246,8 @@ struct RunDetailView: View {
         }
     }
 
-    // MARK: 格式化
-
     private var elapsedText: String {
-        guard let start = run.startedAt else { return "排队" }
+        guard let start = run.startedAt else { return "排队中" }
         let end = run.isActive ? Date() : run.updatedAt
         return shortDuration(from: start, to: end)
     }
@@ -299,17 +264,6 @@ struct RunDetailView: View {
 
     private func shortDuration(from start: Date, to end: Date) -> String {
         let total = max(0, Int(end.timeIntervalSince(start)))
-        let minutes = total / 60
-        let seconds = total % 60
-        return minutes > 0 ? "\(minutes)m \(String(format: "%02d", seconds))s" : "\(seconds)s"
-    }
-
-    private func errorBanner(_ error: AppError) -> some View {
-        Text(error.localizedDescription)
-            .font(.system(size: 11.5))
-            .foregroundStyle(palette.failure)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(12)
-            .background(palette.failure.opacity(0.08), in: .rect(cornerRadius: 12))
+        return "\(total / 60)m \(String(format: "%02d", total % 60))s"
     }
 }

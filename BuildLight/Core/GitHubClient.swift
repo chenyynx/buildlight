@@ -191,6 +191,16 @@ actor GitHubClient {
         try await decode(Actor.self, from: get("/user"))
     }
 
+    /// 当前 token 可见的全部仓库，按最近推送排序。
+    func repositories() async throws -> [RepositorySummary] {
+        let data = try await get("/user/repos", query: [
+            URLQueryItem(name: "per_page", value: "100"),
+            URLQueryItem(name: "sort", value: "pushed"),
+            URLQueryItem(name: "affiliation", value: "owner,collaborator,organization_member")
+        ])
+        return try decode([RepositorySummary].self, from: data)
+    }
+
     func repository(owner: String, name: String) async throws -> RepositorySummary {
         try await decode(RepositorySummary.self, from: get("/repos/\(owner)/\(name)"))
     }

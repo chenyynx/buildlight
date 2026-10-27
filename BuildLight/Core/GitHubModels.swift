@@ -193,6 +193,11 @@ struct Artifact: Decodable, Identifiable, Hashable, Sendable {
 struct RunsPage: Decodable, Sendable {
     let totalCount: Int
     let workflowRuns: [WorkflowRun]
+
+    enum CodingKeys: String, CodingKey {
+        case totalCount = "total_count"
+        case workflowRuns = "workflow_runs"
+    }
 }
 
 struct JobsPage: Decodable, Sendable {
@@ -202,11 +207,23 @@ struct JobsPage: Decodable, Sendable {
 struct ArtifactsPage: Decodable, Sendable {
     let totalCount: Int
     let artifacts: [Artifact]
+
+    enum CodingKeys: String, CodingKey {
+        case totalCount = "total_count"
+        case artifacts
+    }
 }
 
 struct RepositorySummary: Decodable, Sendable {
     let fullName: String
-    let `private`: Bool
+    let isPrivate: Bool
     let defaultBranch: String?
     let pushedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case fullName = "full_name"
+        case isPrivate = "private"
+        case defaultBranch = "default_branch"
+        case pushedAt = "pushed_at"
+    }
 }

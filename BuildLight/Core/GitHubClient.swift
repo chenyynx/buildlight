@@ -139,6 +139,34 @@ actor GitHubClient {
         }
     }
 
+    @discardableResult
+    private func post(_ path: String) async throws -> Data {
+        var request = URLRequest(url: baseURL.appending(path: path))
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
+        request.setValue("0", forHTTPHeaderField: "Content-Length")
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await plain.data(for: request)
+        } catch {
+            throw GitHubError.transport(error.localizedDescription)
+        }
+        guard let http = response as? HTTPURLResponse else { throw GitHubError.transport("响应无效") }
+        updateRateLimit(from: http)
+
+        switch http.statusCode {
+        case 200...299: return data
+        case 401: throw GitHubError.unauthorized
+        case 403, 429: throw GitHubError.rateLimited(reset: lastRateLimitReset)
+        case 404: throw GitHubError.notFound
+        default: throw GitHubError.http(status: http.statusCode, message: "操作失败")
+        }
+    }
+
     private func updateRateLimit(from http: HTTPURLResponse) {
         if let remaining = http.value(forHTTPHeaderField: "X-RateLimit-Remaining").flatMap(Int.init) {
             lastRateLimitRemaining = remaining
@@ -201,6 +229,16 @@ actor GitHubClient {
             from: try await get("/repos/\(owner)/\(repo)/actions/runs/\(runID)/artifacts", query: [URLQueryItem(name: "per_page", value: "30")])
         )
         return page.artifacts.filter { !$0.expired }
+    }
+
+    /// 重新运行整条 run。
+    func rerun(owner: String, repo: String, runID: Int) async throws {
+        try await post("/repos/\(owner)/\(repo)/actions/runs/\(runID)/rerun")
+    }
+
+    /// 取消正在运行的 run。
+    func cancel(owner: String, repo: String, runID: Int) async throws {
+        try await post("/repos/\(owner)/\(repo)/actions/runs/\(runID)/cancel")
     }
 
     /// 下载 artifact 的 zip 到临时目录。

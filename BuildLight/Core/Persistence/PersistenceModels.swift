@@ -131,7 +131,6 @@ final class ArtifactRecord {
     var expiresAt: Date?
     var downloadURL: URL
     var run: RunRecord?
-    var run: RunRecord?
 
     init(from artifact: Artifact, runID: Int) {
         self.id = artifact.id

@@ -2,6 +2,9 @@ import SwiftUI
 
 struct OnboardingView: View {
     @Environment(AppEnvironment.self) private var environment
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var palette: Palette { .resolve(colorScheme) }
 
     @State private var token = ""
     @State private var error: AppError?
@@ -45,6 +48,7 @@ struct OnboardingView: View {
                     .disabled(token.isEmpty || isWorking)
                 }
             }
+            .editorialBackground(palette)
             .navigationTitle("连接 GitHub")
         }
     }

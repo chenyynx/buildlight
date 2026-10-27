@@ -2,7 +2,10 @@ import SwiftUI
 import SwiftData
 
 struct HistoryView: View {
+    @Environment(\.colorScheme) private var colorScheme
     @Query(sort: \RunRecord.createdAt, order: .reverse) private var runs: [RunRecord]
+
+    private var palette: Palette { .resolve(colorScheme) }
 
     var body: some View {
         List {
@@ -10,22 +13,19 @@ struct HistoryView: View {
                 Section {
                     ForEach(group.runs) { run in
                         NavigationLink {
-                            if let repo = run.repo {
-                                RunDetailView(run: run)
-                                    .navigationTitle(repo.displayName)
-                            } else {
-                                RunDetailView(run: run)
-                            }
+                            RunDetailView(run: run)
                         } label: {
-                            RunRow(run: run)
+                            RunRow(run: run, palette: palette)
                         }
+                        .listRowBackground(palette.surface)
                     }
                 } header: {
-                    Text(dayTitle(group.day))
+                    MicroLabel(text: dayTitle(group.day), color: palette.textTertiary)
                 }
             }
         }
         .listStyle(.insetGrouped)
+        .editorialBackground(palette)
         .navigationTitle("历史")
         .navigationBarTitleDisplayMode(.large)
         .overlay {

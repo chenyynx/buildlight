@@ -3,7 +3,10 @@ import SwiftData
 
 struct RunDetailView: View {
     @Environment(AppEnvironment.self) private var environment
+    @Environment(\.colorScheme) private var colorScheme
     let run: RunRecord
+
+    private var palette: Palette { .resolve(colorScheme) }
 
     @State private var jobs: [WorkflowJob] = []
     @State private var loadError: AppError?
@@ -44,6 +47,7 @@ struct RunDetailView: View {
             actionsSection
         }
         .listStyle(.insetGrouped)
+        .editorialBackground(palette)
         .navigationTitle("#\(run.number)")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
@@ -101,7 +105,7 @@ struct RunDetailView: View {
                 .frame(width: 14)
             Text(step.name)
                 .font(.footnote)
-                .foregroundStyle(step.status == .inProgress ? .primary : .secondary)
+                .foregroundStyle(step.status == .inProgress ? palette.textPrimary : palette.textSecondary)
                 .lineLimit(1)
             Spacer(minLength: 6)
             Text(stepTime(step))

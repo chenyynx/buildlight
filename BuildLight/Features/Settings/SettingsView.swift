@@ -3,7 +3,10 @@ import SwiftData
 
 struct SettingsView: View {
     @Environment(AppEnvironment.self) private var environment
+    @Environment(\.colorScheme) private var colorScheme
     @Query(sort: \RepoRecord.sortIndex) private var repos: [RepoRecord]
+
+    private var palette: Palette { .resolve(colorScheme) }
 
     @State private var confirmingSignOut = false
 
@@ -49,6 +52,7 @@ struct SettingsView: View {
                 LabeledContent("配色", value: "跟随系统")
             }
         }
+        .editorialBackground(palette)
         .navigationTitle("设置")
         .confirmationDialog("退出后需要重新填写 Token", isPresented: $confirmingSignOut) {
             Button("退出登录", role: .destructive) {

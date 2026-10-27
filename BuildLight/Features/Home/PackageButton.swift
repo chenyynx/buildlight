@@ -4,7 +4,10 @@ import SwiftUI
 /// 状态全部来自 PackageService，按钮本身不持有任何流程逻辑。
 struct PackageButton: View {
     @Environment(AppEnvironment.self) private var environment
+    @Environment(\.colorScheme) private var colorScheme
     let artifact: ArtifactRecord
+
+    private var palette: Palette { .resolve(colorScheme) }
     let run: RunRecord
 
     var body: some View {
@@ -41,10 +44,16 @@ struct PackageButton: View {
     private func control(systemImage: String, filled: Bool, label: String) -> some View {
         Image(systemName: systemImage)
             .font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(filled ? Color.white : Color.accentColor)
+            .foregroundStyle(filled ? Color.white : palette.textPrimary)
             .frame(width: 34, height: 34)
             .background {
-                Circle().fill(filled ? Color.accentColor : Color.accentColor.opacity(0.12))
+                if filled {
+                    Circle().fill(palette.accentGradient)
+                } else {
+                    Circle()
+                        .fill(palette.textPrimary.opacity(0.06))
+                        .overlay { Circle().strokeBorder(palette.hairline, lineWidth: 0.5) }
+                }
             }
             .contentShape(.circle)
             .accessibilityLabel(label)

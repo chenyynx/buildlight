@@ -3,9 +3,11 @@ import SwiftData
 
 struct RepoDetailView: View {
     @Environment(AppEnvironment.self) private var environment
+    @Environment(\.colorScheme) private var colorScheme
     @Query private var runs: [RunRecord]
 
     private let repo: RepoRecord
+    private var palette: Palette { .resolve(colorScheme) }
 
     init(repo: RepoRecord) {
         self.repo = repo
@@ -22,8 +24,9 @@ struct RepoDetailView: View {
                 NavigationLink {
                     RunDetailView(run: run)
                 } label: {
-                    RunRow(run: run)
+                    RunRow(run: run, palette: palette)
                 }
+                .listRowBackground(palette.surface)
                 .swipeActions(edge: .leading, allowsFullSwipe: true) {
                     if run.isActive {
                         Button(role: .destructive) {
@@ -49,6 +52,7 @@ struct RepoDetailView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .editorialBackground(palette)
         .navigationTitle(repo.displayName)
         .navigationBarTitleDisplayMode(.large)
         .refreshable { await environment.monitor.refreshNow() }
@@ -75,40 +79,42 @@ struct RepoDetailView: View {
 
 struct RunRow: View {
     let run: RunRecord
+    let palette: Palette
 
     var body: some View {
         HStack(spacing: 10) {
             Circle()
                 .fill(statusColor)
                 .frame(width: 7, height: 7)
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(run.title?.isEmpty == false ? run.title! : (run.workflowName ?? "运行"))
-                    .font(.subheadline)
+                    .font(.system(size: 14.5))
+                    .foregroundStyle(palette.textPrimary)
                     .lineLimit(1)
                 Text("#\(run.number) · \(run.branch ?? "—")")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 11))
+                    .foregroundStyle(palette.textTertiary)
                     .lineLimit(1)
             }
             Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 2) {
+            VStack(alignment: .trailing, spacing: 3) {
                 Text(run.isActive ? "运行中" : run.conclusion.label)
-                    .font(.caption)
+                    .font(.system(size: 11))
                     .foregroundStyle(statusColor)
                 Text(relative(run.createdAt))
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(palette.textTertiary)
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 3)
     }
 
     private var statusColor: Color {
-        if run.isActive { return .blue }
+        if run.isActive { return palette.accentStart }
         switch run.conclusion {
-        case .success: return .green
-        case .failure, .timedOut: return .red
-        default: return .secondary
+        case .success: return palette.textSecondary
+        case .failure, .timedOut: return palette.failure
+        default: return palette.textTertiary
         }
     }
 

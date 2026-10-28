@@ -39,6 +39,7 @@ struct RootView: View {
         }
         .task {
             await environment.session.refreshIdentityIfNeeded()
+            await NotificationService.shared.prepareIfNeeded()
         }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
@@ -47,7 +48,9 @@ struct RootView: View {
                 environment.monitor.start()
                 Task { await environment.monitor.refreshNow() }
             default:
-                environment.monitor.stop()
+                // 进后台不主动停轮询：系统挂起进程后循环自然停，醒着的那几十秒
+                // 还能抓到构建完成并弹本地通知。
+                break
             }
         }
     }

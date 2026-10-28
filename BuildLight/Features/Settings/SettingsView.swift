@@ -5,6 +5,9 @@ struct SettingsView: View {
     @Environment(AppEnvironment.self) private var environment
     @Query(sort: \RepoRecord.sortIndex) private var repos: [RepoRecord]
 
+    @Environment(\.openURL) private var openURL
+    @AppStorage(NotificationService.storageKey) private var notifyBuildEvents = true
+    @State private var notificationDenied = false
     @State private var showingSignOutConfirmation = false
     @State private var isSyncing = false
 
@@ -13,6 +16,7 @@ struct SettingsView: View {
             Form {
                 accountSection
                 repositoriesSection
+                notificationSection
                 cacheSection
                 aboutSection
             }
@@ -29,6 +33,7 @@ struct SettingsView: View {
                     RepoDetailView(repo: repo)
                 }
             }
+            .task { await refreshNotificationState() }
             .navigationDestination(for: SettingsRoute.self) { route in
                 switch route {
                 case .cache: CacheView()
@@ -94,6 +99,47 @@ struct SettingsView: View {
         } footer: {
             Text("同步会拉取 Token 能访问的全部仓库，自动加入看板。")
         }
+    }
+
+    private var notificationSection: some View {
+        Section {
+            Toggle(isOn: $notifyBuildEvents) {
+                Label {
+                    Text("构建结束提醒")
+                } icon: {
+                    SettingGlyph(systemImage: "bell.badge.fill", tint: .red)
+                }
+            }
+            .onChange(of: notifyBuildEvents) { _, enabled in
+                guard enabled else { return }
+                Task {
+                    let granted = await NotificationService.shared.requestAuthorization()
+                    notificationDenied = !granted
+                }
+            }
+
+            if notificationDenied {
+                Button("去系统设置开启通知") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        openURL(url)
+                    }
+                }
+                .foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("通知")
+        } footer: {
+            if notificationDenied {
+                Text("系统里关掉了通知权限，App 里的开关暂时不起作用。")
+            } else {
+                Text("构建成功、失败、取消时提醒。App 被系统关掉后收不到——那种情况要靠服务器推送。")
+            }
+        }
+    }
+
+    private func refreshNotificationState() async {
+        await NotificationService.shared.refreshStatus()
+        notificationDenied = NotificationService.shared.isDenied
     }
 
     private var cacheSection: some View {

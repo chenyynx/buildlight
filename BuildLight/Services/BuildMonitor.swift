@@ -15,6 +15,8 @@ final class BuildMonitor {
     private(set) var isRefreshing = false
     private(set) var lastRefreshAt: Date?
     private var pausedUntil: Date?
+    /// 第一次见到某个仓库时不发通知，否则刚装 App 会把历史失败全推一遍。
+    private var primedRepos: Set<String> = []
     private var loop: Task<Void, Never>?
 
     private let activeInterval: TimeInterval = 3
@@ -129,11 +131,18 @@ final class BuildMonitor {
         for record in repo.runs { byID[record.id] = record }
 
         var changed = false
+        var finished: [(id: Int, run: WorkflowRun, started: Date?)] = []
+        let isFirstSight = !primedRepos.contains(repo.fullName)
+
         for run in runs {
             if let existing = byID[run.id] {
+                let wasActive = existing.isActive
                 let before = existing.updatedAt
                 existing.apply(run)
                 if existing.updatedAt != before { changed = true }
+                if wasActive, !existing.isActive, !isFirstSight {
+                    finished.append((run.id, run, existing.startedAt))
+                }
             } else {
                 let record = RunRecord(from: run, repoFullName: repo.fullName)
                 record.repo = repo
@@ -142,6 +151,8 @@ final class BuildMonitor {
                 changed = true
             }
         }
+
+        primedRepos.insert(repo.fullName)
 
         let ordered = byID.values.sorted { $0.createdAt > $1.createdAt }
         for stale in ordered.dropFirst(historyLimit) {
@@ -179,6 +190,20 @@ final class BuildMonitor {
             repo.latestWorkflowName = snapshot.workflow
             repo.latestNumber = snapshot.number
             repo.activeRunCount = snapshot.active
+
+            // 只推「最新那条」的完成事件，矩阵构建的多条 job 不会轮番轰炸
+            if let hit = finished.first(where: { $0.id == snapshot.id }) {
+                let start = hit.started ?? hit.run.runStartedAt ?? hit.run.createdAt
+                let event = BuildEvent(
+                    runID: hit.id,
+                    repo: repo.displayName,
+                    branch: hit.run.headBranch,
+                    number: hit.run.runNumber,
+                    conclusion: hit.run.conclusionRaw ?? "",
+                    duration: hit.run.updatedAt.timeIntervalSince(start)
+                )
+                Task { await NotificationService.shared.notify(event) }
+            }
         } else {
             repo.latestRunID = nil
             repo.latestRunAt = nil

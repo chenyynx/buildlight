@@ -26,7 +26,7 @@ struct HistoryRunRow: View {
                 Text(run.isActive ? "运行中" : run.conclusion.label)
                     .font(.tag)
                     .foregroundStyle(statusColor)
-                Text(run.createdAt.formatted(.relative(presentation: .named)))
+                Text(RelativeTime.text(for: run.createdAt))
                     .font(.tag)
                     .foregroundStyle(.tertiary)
             }
@@ -49,10 +49,10 @@ struct HistoryRunRow: View {
     }
 
     private var statusColor: Color {
-        if run.isActive { return Accent.primary }
+        if run.isActive { return StatusTone.running }
         switch run.conclusion {
-        case .success: return .green
-        case .failure, .timedOut: return .red
+        case .success: return StatusTone.idle
+        case .failure, .timedOut: return StatusTone.failed
         default: return .secondary
         }
     }

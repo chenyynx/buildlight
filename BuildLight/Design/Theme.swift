@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// 全 App 唯一强调色：酒红。除语义状态（成功/失败）外不引入第二种品牌色。
 enum Accent {
@@ -13,6 +14,30 @@ enum Accent {
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
+    }
+}
+
+/// 状态色只表达状态，不参与品牌。
+///
+/// 全 App 只有两个信号色：
+/// - 正在跑 = 琥珀（和品牌酒红、失败红都拉开色相）
+/// - 失败   = 砖红
+/// 完成 → 中性。完成不需要颜色，它只需要「不打扰」。
+enum StatusTone {
+    static let running = dynamic(light: 0xC2703A, dark: 0xE8A063)
+    static let failed = dynamic(light: 0xB23A2C, dark: 0xF0736A)
+    static let idle = dynamic(light: 0xB0AAA4, dark: 0x6E6A66)
+
+    private static func dynamic(light: UInt32, dark: UInt32) -> Color {
+        Color(uiColor: UIColor { traits in
+            let hex = traits.userInterfaceStyle == .dark ? dark : light
+            return UIColor(
+                red: CGFloat((hex >> 16) & 0xFF) / 255,
+                green: CGFloat((hex >> 8) & 0xFF) / 255,
+                blue: CGFloat(hex & 0xFF) / 255,
+                alpha: 1
+            )
+        })
     }
 }
 
@@ -65,5 +90,21 @@ extension View {
     /// 真正的液态玻璃，只留给少量、静止的元素（例如顶部摘要胶囊）。
     func glassInteractive(cornerRadius: CGFloat = Metrics.radiusM) -> some View {
         self.glassEffect(.regular.interactive(), in: .rect(cornerRadius: cornerRadius))
+    }
+
+    /// 列表卡片用的液态玻璃。开了系统「降低透明度」就退回磨砂，
+    /// 这是用户自己选的省电/可读性偏好，尊重它比强行好看重要。
+    @ViewBuilder
+    func glassCard(cornerRadius: CGFloat = Metrics.radiusL, reduceTransparency: Bool) -> some View {
+        if reduceTransparency {
+            self
+                .background(.regularMaterial, in: .rect(cornerRadius: cornerRadius))
+                .overlay {
+                    RoundedRectangle(cornerRadius: cornerRadius)
+                        .strokeBorder(.white.opacity(0.08), lineWidth: 0.5)
+                }
+        } else {
+            self.glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
+        }
     }
 }

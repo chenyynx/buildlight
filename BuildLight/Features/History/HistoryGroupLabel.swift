@@ -49,8 +49,8 @@ struct HistoryGroupLabel: View {
         guard let latest else { return .secondary }
         if latest.isActive { return Accent.primary }
         switch latest.conclusion {
-        case .success: return .green
-        case .failure, .timedOut: return .red
+        case .success: return StatusTone.idle
+        case .failure, .timedOut: return StatusTone.failed
         default: return .secondary
         }
     }

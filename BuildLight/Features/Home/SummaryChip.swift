@@ -5,14 +5,31 @@ import SwiftUI
 struct SummaryChip: View {
     let title: String
     let systemImage: String
-    let isProminent: Bool
+    /// 状态点颜色。有颜色 = 这个数字代表一个状态；没有 = 纯统计。
+    var tint: Color? = nil
+    /// 正在发生的状态用呼吸点，静态统计用圆点。
+    var animated: Bool = false
 
     var body: some View {
-        Label(title, systemImage: systemImage)
-            .font(.caption)
-            .foregroundStyle(isProminent ? AnyShapeStyle(Accent.primary) : AnyShapeStyle(.secondary))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(.quaternary.opacity(0.45), in: .capsule)
+        HStack(spacing: 5) {
+            if let tint {
+                if animated {
+                    PulsingDot(color: tint, size: 5)
+                } else {
+                    Circle().fill(tint).frame(width: 6, height: 6)
+                }
+            } else {
+                Image(systemName: systemImage)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            Text(title)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+        }
+        .padding(.horizontal, 11)
+        .padding(.vertical, 6)
+        .background(.quaternary.opacity(0.4), in: .capsule)
     }
 }

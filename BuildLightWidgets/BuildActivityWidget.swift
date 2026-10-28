@@ -107,6 +107,6 @@ private struct LockScreenBuildView: View {
 }
 
 private enum Palette {
-    /// 和 App 里的酒红强调色对齐。
-    static let wine = Color(red: 0.76, green: 0.35, blue: 0.42)
+    /// 和 App 里的「运行中」状态色对齐：琥珀，不是酒红。
+    static let wine = Color(red: 0.91, green: 0.63, blue: 0.39)
 }

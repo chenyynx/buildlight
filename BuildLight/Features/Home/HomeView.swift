@@ -11,6 +11,14 @@ struct HomeView: View {
     @State private var showingSyncError = false
     @State private var didSync = false
 
+    private func packageTarget(for repo: RepoRecord) -> PackageTarget? {
+        guard let id = repo.packageID,
+              let name = repo.packageName,
+              let url = repo.packageURL
+        else { return nil }
+        return PackageTarget(id: id, name: name, archiveURL: url)
+    }
+
     private let columns = [
         GridItem(.flexible(), spacing: 12),
         GridItem(.flexible(), spacing: 12)
@@ -38,12 +46,20 @@ struct HomeView: View {
                         }
                         .padding(.top, 40)
                     } else {
-                        LazyVGrid(columns: columns, spacing: 12) {
+                        LazyVGrid(columns: columns, spacing: 10) {
                             ForEach(items) { repo in
-                                NavigationLink(value: repo.fullName) {
-                                    RepoCardView(repo: repo)
+                                ZStack(alignment: .topTrailing) {
+                                    NavigationLink(value: repo.fullName) {
+                                        RepoCardView(repo: repo)
+                                    }
+                                    .buttonStyle(.plain)
+
+                                    // 按钮必须浮在 NavigationLink 外面，否则点它只会进详情
+                                    if let target = packageTarget(for: repo) {
+                                        PackageButton(target: target)
+                                            .padding(10)
+                                    }
                                 }
-                                .buttonStyle(.plain)
                             }
                         }
                     }

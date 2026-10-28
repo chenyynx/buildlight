@@ -16,6 +16,9 @@ final class PackageService {
 
     private(set) var states: [Int: State] = [:]
     private var tasks: [Int: Task<Void, Never>] = [:]
+    /// 进度每 1% 才写一次状态：URLSession 的回调是每个数据块一次，
+    /// 原样透传会让整墙卡片每秒重绘几十次。
+    private var lastProgress: [Int: Double] = [:]
 
     private let session: GitHubSession
     private let cache: CacheStore
@@ -40,6 +43,7 @@ final class PackageService {
         }
 
         states[target.id] = .downloading(0)
+        lastProgress[target.id] = 0
         tasks[target.id] = Task { [weak self] in
             guard let self else { return }
             defer { self.tasks[target.id] = nil }
@@ -51,11 +55,15 @@ final class PackageService {
                 let zipURL = try await self.downloader.download(request) { [weak self] progress in
                     Task { @MainActor [weak self] in
                         guard let self, case .downloading = self.states[target.id] else { return }
+                        let previous = self.lastProgress[target.id] ?? 0
+                        guard progress >= 1 || progress - previous >= 0.01 else { return }
+                        self.lastProgress[target.id] = progress
                         self.states[target.id] = .downloading(progress)
                     }
                 }
                 defer { try? FileManager.default.removeItem(at: zipURL) }
 
+                self.states[target.id] = .downloading(1)
                 self.states[target.id] = .unzipping
                 let destination = FileManager.default.temporaryDirectory
                     .appendingPathComponent("bl-unzip-\(target.id)-\(UUID().uuidString)", isDirectory: true)
@@ -76,6 +84,7 @@ final class PackageService {
     func reset(_ artifactID: Int) {
         tasks[artifactID]?.cancel()
         tasks[artifactID] = nil
+        lastProgress[artifactID] = nil
         states[artifactID] = nil
         cache.remove(artifactID)
     }

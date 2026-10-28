@@ -44,15 +44,15 @@ struct RunRow: View {
     }
 
     private var statusColor: Color {
-        if run.isActive { return Color.accentColor }
+        if run.isActive { return StatusTone.running }
         switch run.conclusion {
-        case .success: return .green
-        case .failure, .timedOut: return .red
+        case .success: return StatusTone.idle
+        case .failure, .timedOut: return StatusTone.failed
         default: return .secondary
         }
     }
 
     private var relativeDate: String {
-        run.createdAt.formatted(.relative(presentation: .named))
+        RelativeTime.text(for: run.createdAt)
     }
 }

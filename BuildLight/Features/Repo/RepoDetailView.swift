@@ -18,6 +18,16 @@ struct RepoDetailView: View {
 
     var body: some View {
         List {
+            if let target = latestPackage {
+                Section {
+                    latestPackageRow(target)
+                } header: {
+                    Text("最新产物")
+                } footer: {
+                    Text(packageFooter)
+                }
+            }
+
             ForEach(filteredRuns) { run in
                 NavigationLink(value: RunRoute(runID: run.id)) {
                     RunRow(run: run)
@@ -55,6 +65,52 @@ struct RepoDetailView: View {
                 )
             }
         }
+    }
+
+    private var latestPackage: PackageTarget? {
+        guard let id = repo.packageID,
+              let name = repo.packageName,
+              let url = repo.packageURL
+        else { return nil }
+        return PackageTarget(id: id, name: name, archiveURL: url)
+    }
+
+    /// 进详情第一屏就是包，不用再往下翻。
+    private func latestPackageRow(_ target: PackageTarget) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "shippingbox.fill")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Accent.primary)
+                .frame(width: 36, height: 36)
+                .background(Accent.soft, in: .rect(cornerRadius: 10))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(target.name)
+                    .font(.subheadline.weight(.medium))
+                    .lineLimit(1)
+                Text(packageSizeText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 8)
+            PackageButton(target: target)
+        }
+        .padding(.vertical, 2)
+    }
+
+    private var packageSizeText: String {
+        repo.packageSize > 0
+            ? ByteCountFormatter.string(fromByteCount: Int64(repo.packageSize), countStyle: .file)
+            : "点右侧下载"
+    }
+
+    private var packageFooter: String {
+        var parts: [String] = []
+        if let branch = repo.latestBranch, !branch.isEmpty { parts.append(branch) }
+        if repo.latestNumber > 0 { parts.append("#\(repo.latestNumber)") }
+        parts.append("构建完成后自动更新")
+        return parts.joined(separator: " · ")
     }
 
     private var filteredRuns: [RunRecord] {

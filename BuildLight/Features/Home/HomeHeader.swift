@@ -8,19 +8,19 @@ struct HomeHeader: View {
             SummaryChip(
                 title: "\(activeCount) 个在跑",
                 systemImage: "bolt.fill",
-                isProminent: activeCount > 0
+                tint: activeCount > 0 ? StatusTone.running : StatusTone.idle,
+                animated: activeCount > 0
             )
             if failingCount > 0 {
                 SummaryChip(
                     title: "\(failingCount) 个失败",
                     systemImage: "exclamationmark.triangle.fill",
-                    isProminent: false
+                    tint: StatusTone.failed
                 )
             }
             SummaryChip(
                 title: "\(repos.count) 个仓库",
-                systemImage: "shippingbox.fill",
-                isProminent: false
+                systemImage: "shippingbox.fill"
             )
         }
         .padding(.horizontal, Metrics.m)

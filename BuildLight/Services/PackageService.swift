@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import ZIPFoundation
 
-/// 取包流程：下载（带进度）→ 解压 → 落进缓存 → 交给系统分享面板。
+/// 取包流程：下载（后台会话，可跨挂起）→ 解压 → 落进缓存 → 交给系统分享面板。
 @MainActor
 @Observable
 final class PackageService {
@@ -22,7 +22,6 @@ final class PackageService {
 
     private let session: GitHubSession
     private let cache: CacheStore
-    private let downloader = ArtifactDownloader()
 
     init(session: GitHubSession, cache: CacheStore) {
         self.session = session
@@ -52,7 +51,11 @@ final class PackageService {
                 request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
                 request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
 
-                let zipURL = try await self.downloader.download(request) { [weak self] progress in
+                let zipURL = try await BackgroundDownloadCenter.shared.download(
+                    request,
+                    artifactID: target.id,
+                    name: target.name
+                ) { [weak self] progress in
                     Task { @MainActor [weak self] in
                         guard let self, case .downloading = self.states[target.id] else { return }
                         let previous = self.lastProgress[target.id] ?? 0
@@ -61,22 +64,36 @@ final class PackageService {
                         self.states[target.id] = .downloading(progress)
                     }
                 }
-                defer { try? FileManager.default.removeItem(at: zipURL) }
 
-                self.states[target.id] = .downloading(1)
                 self.states[target.id] = .unzipping
-                let destination = FileManager.default.temporaryDirectory
-                    .appendingPathComponent("bl-unzip-\(target.id)-\(UUID().uuidString)", isDirectory: true)
-                try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
-                try FileManager.default.unzipItem(at: zipURL, to: destination)
-
-                guard let ipa = Self.firstIPA(in: destination) else {
-                    throw AppError.packageMissing
-                }
-                let stored = try self.cache.save(fileURL: ipa, id: target.id, name: ipa.lastPathComponent)
+                let stored = try self.finalize(zipURL: zipURL, id: target.id)
                 self.states[target.id] = .ready(stored)
             } catch {
                 self.states[target.id] = .failed(AppError.map(error))
+            }
+        }
+    }
+
+    /// App 回到前台时调用：把系统在后台替我们下完的文件解压入库。
+    /// 解压不在后台做——ZIPFoundation 不适合在被挂起的进程里跑。
+    func resumeBackgroundDownloads() {
+        for pending in BackgroundDownloadCenter.pendingDownloads() {
+            guard tasks[pending.artifactID] == nil else { continue }
+            guard BackgroundDownloadCenter.takePending(artifactID: pending.artifactID) != nil else { continue }
+
+            states[pending.artifactID] = .unzipping
+            tasks[pending.artifactID] = Task { [weak self] in
+                guard let self else { return }
+                defer { self.tasks[pending.artifactID] = nil }
+                do {
+                    let stored = try self.finalize(
+                        zipURL: URL(fileURLWithPath: pending.path),
+                        id: pending.artifactID
+                    )
+                    self.states[pending.artifactID] = .ready(stored)
+                } catch {
+                    self.states[pending.artifactID] = .failed(AppError.map(error))
+                }
             }
         }
     }
@@ -87,6 +104,24 @@ final class PackageService {
         lastProgress[artifactID] = nil
         states[artifactID] = nil
         cache.remove(artifactID)
+    }
+
+    // MARK: 内部
+
+    private func finalize(zipURL: URL, id: Int) throws -> URL {
+        defer { try? FileManager.default.removeItem(at: zipURL) }
+
+        let destination = FileManager.default.temporaryDirectory
+            .appendingPathComponent("bl-unzip-\(id)-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: destination) }
+
+        try FileManager.default.unzipItem(at: zipURL, to: destination)
+
+        guard let ipa = Self.firstIPA(in: destination) else {
+            throw AppError.packageMissing
+        }
+        return try cache.save(fileURL: ipa, id: id, name: ipa.lastPathComponent)
     }
 
     nonisolated private static func firstIPA(in directory: URL) -> URL? {

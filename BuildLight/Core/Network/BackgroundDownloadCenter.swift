@@ -82,14 +82,10 @@ final class BackgroundDownloadCenter: NSObject, @unchecked Sendable {
             watchdogs[taskID] = Task { [weak self] in
                 try? await Task.sleep(for: .seconds(Self.stallSeconds))
                 guard let self, !Task.isCancelled else { return }
-                self.lock.lock()
-                let pending = self.continuations[taskID] != nil
-                let advanced = self.progressed[taskID] ?? false
-                let live = self.liveTasks[taskID]
-                self.lock.unlock()
-                guard pending, !advanced else { return }
+                let snapshot = self.stallSnapshot(taskID: taskID)
+                guard snapshot.pending, !snapshot.advanced else { return }
                 Self.isAvailable = false
-                live?.cancel()
+                snapshot.task?.cancel()
                 self.finish(taskID: taskID, result: .failure(GitHubError.transport("后台下载通道无响应")))
             }
 
@@ -122,6 +118,13 @@ final class BackgroundDownloadCenter: NSObject, @unchecked Sendable {
     private static func save(_ items: [Pending]) {
         guard let data = try? JSONEncoder().encode(items) else { return }
         UserDefaults.standard.set(data, forKey: pendingKey)
+    }
+
+    /// 同步方法里加锁：Swift 6 不允许在 async 上下文直接 lock/unlock。
+    private func stallSnapshot(taskID: Int) -> (pending: Bool, advanced: Bool, task: URLSessionDownloadTask?) {
+        lock.lock()
+        defer { lock.unlock() }
+        return (continuations[taskID] != nil, progressed[taskID] ?? false, liveTasks[taskID])
     }
 
     private func finish(taskID: Int, result: Result<URL, Error>) {

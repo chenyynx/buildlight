@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import UIKit
 import ZIPFoundation
 
 /// 取包流程：下载（后台会话，可跨挂起）→ 解压 → 落进缓存 → 交给系统分享面板。
@@ -77,16 +78,14 @@ final class PackageService {
             }
         }
 
-        if BackgroundDownloadCenter.isAvailable {
-            do {
-                return try await BackgroundDownloadCenter.shared.download(
-                    request,
-                    artifactID: target.id,
-                    name: target.name,
-                    onProgress: progress
-                )
-            } catch {
-                return try await fallback.download(request, onProgress: progress)
+        // 后台会话（BackgroundDownloadCenter）在自签/企业签环境下不可靠：
+        // 进度回调正常、字节也下完了，但「文件交付」回调永远不来，
+        // 表现就是卡在 100%。在拿到开发者证书之前不启用它。
+        // 折中方案：普通会话 + 后台任务断言，切走 App 后还有约 30 秒宽限。
+        let assertion = UIApplication.shared.beginBackgroundTask(withName: "artifact-download")
+        defer {
+            if assertion != .invalid {
+                UIApplication.shared.endBackgroundTask(assertion)
             }
         }
         return try await fallback.download(request, onProgress: progress)

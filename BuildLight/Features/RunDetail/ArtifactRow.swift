@@ -22,7 +22,13 @@ struct ArtifactRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
-                PackageButton(artifact: artifact)
+                PackageButton(
+                    target: PackageTarget(
+                        id: artifact.id,
+                        name: artifact.name,
+                        archiveURL: artifact.downloadURL
+                    )
+                )
             }
         }
         .padding(.vertical, 2)

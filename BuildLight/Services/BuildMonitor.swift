@@ -2,29 +2,26 @@ import Foundation
 import Observation
 import SwiftData
 
-/// 拉取并落库。UI 不直接调它拿数据——数据从 SwiftData 读，
-/// 这里只负责把远端状态写进去。
+/// 拉取并落库。UI 只读 SwiftData，这里负责把远端状态写进去，
+/// 同时维护每张卡片需要的冗余快照字段（避免视图层反复计算）。
 @MainActor
 @Observable
 final class BuildMonitor {
     private let context: ModelContext
     private let session: GitHubSession
 
-    /// 每个仓库下一次该拉取的时间，按活跃度自适应。
     private var nextPollAt: [String: Date] = [:]
-    /// 每个仓库最近一次错误，用于卡片上的降级提示。
     private(set) var errors: [String: AppError] = [:]
     private(set) var isRefreshing = false
     private(set) var lastRefreshAt: Date?
-    /// 触发限流时整体暂停到这个时间。
     private var pausedUntil: Date?
-
     private var loop: Task<Void, Never>?
 
     private let activeInterval: TimeInterval = 3
-    private let idleInterval: TimeInterval = 45
-    private let retryInterval: TimeInterval = 15
+    private let idleInterval: TimeInterval = 60
+    private let retryInterval: TimeInterval = 20
     private let historyLimit = 30
+    private let maxReposPerTick = 6
 
     init(context: ModelContext, session: GitHubSession) {
         self.context = context
@@ -64,7 +61,7 @@ final class BuildMonitor {
             .filter { !$0.isHidden }
             .filter { (nextPollAt[$0.fullName] ?? .distantPast) <= now }
             .sorted { priority($0) < priority($1) }
-            .prefix(6)
+            .prefix(maxReposPerTick)
         guard !due.isEmpty else { return }
 
         isRefreshing = true
@@ -74,20 +71,17 @@ final class BuildMonitor {
         }
 
         for repo in due {
-            // 先占位，避免下一轮重复触发；网络请求本身是并发的，这里串行的是状态收敛
             nextPollAt[repo.fullName] = now.addingTimeInterval(activeInterval)
             await refresh(repo: repo, client: client)
         }
     }
 
-    /// 正在跑的最优先，其次是有历史的，最后是还没发现工作流的。
     private func priority(_ repo: RepoRecord) -> Int {
         if repo.isRunning { return 0 }
-        if repo.latestRun != nil { return 1 }
+        if repo.latestRunAt != nil { return 1 }
         return 2
     }
 
-    /// 手动刷新：忽略退避，立刻拉一轮。
     func refreshNow() async {
         nextPollAt.removeAll()
         await tick()
@@ -102,17 +96,15 @@ final class BuildMonitor {
             errors[repo.fullName] = nil
 
             let hasActive = runs.contains(where: \.isActive)
-            let hasHistory = !runs.isEmpty
-            repo.hasWorkflows = hasHistory
+            repo.hasWorkflows = !runs.isEmpty
 
-            if !hasHistory {
-                // 没有任何 Actions 记录的仓库，一小时后再看一次
+            if runs.isEmpty {
                 nextPollAt[repo.fullName] = Date().addingTimeInterval(3600)
             } else {
                 nextPollAt[repo.fullName] = Date().addingTimeInterval(hasActive ? activeInterval : idleInterval)
             }
 
-            await loadArtifacts(for: Array(runs.prefix(3)), repo: repo, client: client)
+            await loadArtifacts(for: Array(runs.prefix(2)), repo: repo, client: client)
         } catch {
             let mapped = AppError.map(error)
             errors[repo.fullName] = mapped
@@ -135,13 +127,9 @@ final class BuildMonitor {
     }
 
     private func apply(runs: [WorkflowRun], to repo: RepoRecord) {
-        if let filter = repo.workflowFilter, !filter.isEmpty {
-            // 过滤只影响展示，落库仍存全部，切换过滤条件时无需重新拉取
-            _ = filter
-        }
-
         var byID: [Int: RunRecord] = [:]
         for record in repo.runs { byID[record.id] = record }
+
         for run in runs {
             if let existing = byID[run.id] {
                 existing.apply(run)
@@ -153,10 +141,31 @@ final class BuildMonitor {
             }
         }
 
-        // 裁剪超出的历史
         let ordered = byID.values.sorted { $0.createdAt > $1.createdAt }
         for stale in ordered.dropFirst(historyLimit) {
             context.delete(stale)
+        }
+
+        // 维护卡片快照
+        let filter = repo.workflowFilter
+        let relevant = ordered.filter { filter == nil || filter?.isEmpty == true || $0.workflowName == filter }
+        if let latest = relevant.first {
+            repo.latestRunID = latest.id
+            repo.latestRunAt = latest.updatedAt
+            repo.latestStartedAt = latest.startedAt
+            repo.latestStatusRaw = latest.statusRaw
+            repo.latestConclusionRaw = latest.conclusionRaw
+            repo.latestBranch = latest.branch
+            repo.latestWorkflowName = latest.workflowName
+            repo.latestNumber = latest.number
+            repo.activeRunCount = relevant.filter(\.isActive).count
+        } else {
+            repo.latestRunID = nil
+            repo.latestRunAt = nil
+            repo.latestStartedAt = nil
+            repo.latestStatusRaw = ""
+            repo.latestConclusionRaw = nil
+            repo.activeRunCount = 0
         }
 
         repo.lastCheckedAt = .now
@@ -164,12 +173,14 @@ final class BuildMonitor {
     }
 
     private func loadArtifacts(for runs: [WorkflowRun], repo: RepoRecord, client: GitHubClient) async {
-        guard !runs.isEmpty else { return }
         for run in runs {
             let runID = run.id
-            guard let artifacts = try? await client.artifacts(owner: repo.owner, repo: repo.name, runID: runID) else {
-                continue
-            }
+            guard let artifacts = try? await client.artifacts(
+                owner: repo.owner,
+                repo: repo.name,
+                runID: runID
+            ) else { continue }
+
             let existingIDs = Set(
                 ((try? context.fetch(
                     FetchDescriptor<ArtifactRecord>(predicate: #Predicate { $0.runID == runID })
@@ -178,12 +189,33 @@ final class BuildMonitor {
             let runRecord = (try? context.fetch(
                 FetchDescriptor<RunRecord>(predicate: #Predicate { $0.id == runID })
             ))?.first
+
             for artifact in artifacts where !existingIDs.contains(artifact.id) {
                 let record = ArtifactRecord(from: artifact, runID: runID)
                 record.run = runRecord
                 context.insert(record)
             }
+
+            // 只有最新一次的产物才写进卡片快照
+            guard runID == repo.latestRunID, let best = bestPackage(in: artifacts) else { continue }
+            repo.packageID = best.id
+            repo.packageName = best.name
+            repo.packageURL = best.archiveDownloadUrl
+            repo.packageSize = best.sizeInBytes
         }
         try? context.save()
+    }
+
+    private func bestPackage(in artifacts: [Artifact]) -> Artifact? {
+        artifacts
+            .filter { !$0.expired }
+            .max { score($0.name) < score($1.name) }
+    }
+
+    private func score(_ name: String) -> Int {
+        let lowered = name.lowercased()
+        if lowered.contains("ipa") { return 2 }
+        if lowered.contains("unsigned") || lowered.contains("build") { return 1 }
+        return 0
     }
 }

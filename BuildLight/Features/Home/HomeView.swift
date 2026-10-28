@@ -108,8 +108,8 @@ struct HomeView: View {
         // 按构建活跃度排：在跑的置顶，其余按最近一次运行时间倒序
         return result.sorted { lhs, rhs in
             if lhs.isRunning != rhs.isRunning { return lhs.isRunning }
-            let left = lhs.latestRun?.updatedAt ?? lhs.addedAt
-            let right = rhs.latestRun?.updatedAt ?? rhs.addedAt
+            let left = lhs.latestRunAt ?? lhs.addedAt
+            let right = rhs.latestRunAt ?? rhs.addedAt
             return left > right
         }
     }

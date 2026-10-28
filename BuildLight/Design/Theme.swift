@@ -52,7 +52,7 @@ extension View {
     /// 刻意不用 `.glassEffect` / `.ultraThinMaterial`——每张卡都做实时模糊会拖垮滚动。
     func cardSurface(
         cornerRadius: CGFloat = Metrics.radiusL,
-        fill: some ShapeStyle = .quaternary.opacity(0.45)
+        fill: AnyShapeStyle = AnyShapeStyle(.quaternary.opacity(0.45))
     ) -> some View {
         self
             .background(fill, in: .rect(cornerRadius: cornerRadius))

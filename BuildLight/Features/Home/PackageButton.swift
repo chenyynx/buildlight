@@ -1,16 +1,15 @@
 import SwiftUI
 
-/// 取包入口：下载 → 解压 → 交给系统分享面板（全能签/AltStore）。
-/// 状态全部来自 PackageService，视图本身不持有流程。
+/// 取包入口：下载（带进度）→ 解压 → 交给系统分享面板。
 struct PackageButton: View {
     @Environment(AppEnvironment.self) private var environment
-    let artifact: ArtifactRecord
+    let target: PackageTarget
 
     var body: some View {
-        switch environment.packages.state(for: artifact.id) {
+        switch environment.packages.state(for: target.id) {
         case .idle:
             Button("下载构建产物", systemImage: "arrow.down") {
-                environment.packages.start(artifact.value)
+                environment.packages.start(target)
             }
             .labelStyle(.iconOnly)
             .buttonStyle(.bordered)
@@ -35,11 +34,11 @@ struct PackageButton: View {
             .labelStyle(.iconOnly)
             .buttonStyle(.borderedProminent)
             .buttonBorderShape(.circle)
-            .accessibilityLabel("导入 \(artifact.name)")
+            .accessibilityLabel("导入 \(target.name)")
 
         case .failed:
             Button("重试下载", systemImage: "arrow.clockwise") {
-                environment.packages.start(artifact.value)
+                environment.packages.start(target)
             }
             .labelStyle(.iconOnly)
             .buttonStyle(.bordered)

@@ -19,6 +19,28 @@ final class RepoRecord {
     /// 用户手动隐藏的仓库。
     var isHidden: Bool = false
 
+    // 以下字段是「最近一次运行」的冗余快照。
+    // 卡片只读这些标量，不再每帧去遍历关系数组、排序、查磁盘。
+    var latestRunAt: Date?
+    var latestStartedAt: Date?
+    var latestStatusRaw: String = ""
+    var latestConclusionRaw: String?
+    var latestBranch: String?
+    var latestWorkflowName: String?
+    var latestNumber: Int = 0
+    var latestRunID: Int?
+    var activeRunCount: Int = 0
+
+    // 可下载产物（有就取，没有为空）
+    var packageID: Int?
+    var packageName: String?
+    var packageURL: URL?
+    var packageSize: Int = 0
+
+    var isRunning: Bool { activeRunCount > 0 }
+    var latestFailed: Bool { latestConclusionRaw == "failure" }
+    var hasPackage: Bool { packageID != nil }
+
     @Relationship(deleteRule: .cascade, inverse: \RunRecord.repo)
     var runs: [RunRecord] = []
 

@@ -36,10 +36,10 @@ final class CacheStore {
         ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file)
     }
 
+    /// 只查内存索引，不做磁盘 IO——列表里每张卡片每帧都会调用它。
     func url(for id: Int) -> URL? {
         guard let entry = entries.first(where: { $0.id == id }) else { return nil }
-        let url = directory.appendingPathComponent(entry.fileName)
-        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+        return directory.appendingPathComponent(entry.fileName)
     }
 
     /// 把解压出来的 ipa 收进缓存，返回最终路径。

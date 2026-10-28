@@ -79,6 +79,8 @@ extension ArtifactDownloader: URLSessionDownloadDelegate {
             try? FileManager.default.removeItem(at: destination)
             try FileManager.default.moveItem(at: location, to: destination)
             movedURL = destination
+            // 同上：落盘即交付，不等 didCompleteWithError
+            finish(.success(destination))
         } catch {
             finish(.failure(error))
         }

@@ -189,6 +189,10 @@ extension BackgroundDownloadCenter: URLSessionDownloadDelegate {
             lock.lock()
             movedURLs[downloadTask.taskIdentifier] = destination
             lock.unlock()
+
+            // 文件已经落盘就算成功，不等 didCompleteWithError。
+            // 后台会话在部分签名环境下不会回调完成事件，等它就会永远卡在 100%。
+            finish(taskID: downloadTask.taskIdentifier, result: .success(destination))
         } catch {
             finish(taskID: downloadTask.taskIdentifier, result: .failure(error))
         }

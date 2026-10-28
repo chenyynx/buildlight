@@ -1,4 +1,4 @@
-import ActivityKit
+@preconcurrency import ActivityKit
 import Foundation
 
 /// 锁屏 / 灵动岛的构建实时活动。
@@ -10,7 +10,8 @@ import Foundation
 final class BuildActivityController {
     static let shared = BuildActivityController()
 
-    private var activity: Activity<BuildActivityAttributes>?
+    /// Activity 不是 Sendable：去掉 actor 隔离声明，避免 Swift 6 的 sending 检查。
+    nonisolated(unsafe) private var activity: Activity<BuildActivityAttributes>?
     private let enabled: Bool
 
     private init() {

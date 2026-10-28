@@ -18,7 +18,7 @@ jobs:
   # 1) 只编译：最快的反馈，编不过就不用往下走了
   build:
     name: 编译
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -29,12 +29,18 @@ jobs:
       - name: 生成工程
         run: xcodegen generate
 
-      - name: 选择最新 Xcode
+      - name: 选择最新 Xcode（必须 26+，否则拿不到 Liquid Glass）
         run: |
           CANDIDATE=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
           echo "使用 $CANDIDATE"
           sudo xcode-select -s "$CANDIDATE"
           xcodebuild -version
+          SDK=$(xcrun --sdk iphoneos --show-sdk-version)
+          echo "iPhoneOS SDK: $SDK"
+          case "$SDK" in
+            26.*) ;;
+            *) echo "::error::SDK $SDK 不是 26.x，构建出的 App 不会有 iOS 26 原生外观"; exit 1 ;;
+          esac
 
       - name: 缓存 SPM 依赖
         uses: actions/cache@v4
@@ -69,7 +75,7 @@ jobs:
   test:
     name: 单元测试
     needs: build
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
@@ -122,7 +128,7 @@ jobs:
   ipa:
     name: 无签名 IPA
     needs: build
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4

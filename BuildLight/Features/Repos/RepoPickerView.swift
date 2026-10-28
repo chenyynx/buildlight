@@ -77,7 +77,7 @@ struct RepoPickerView: View {
                             .font(.body)
                             .foregroundStyle(.primary)
                         if let pushed = repository.pushedAt {
-                            Text("最近推送 \(pushed, format: .relative(presentation: .named))")
+                            Text("最近推送 \(relativeText(pushed))")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -104,6 +104,10 @@ struct RepoPickerView: View {
     private var filtered: [RepositorySummary] {
         guard !query.isEmpty else { return repositories }
         return repositories.filter { $0.fullName.localizedCaseInsensitiveContains(query) }
+    }
+
+    private func relativeText(_ date: Date) -> String {
+        date.formatted(.relative(presentation: .named))
     }
 
     private func toggle(_ repository: RepositorySummary) {

@@ -39,11 +39,12 @@ struct RepoCardView: View {
                 }
             }
 
-            progressBar
+            CardProgressBar(ratio: ratio, color: statusColor)
                 .padding(.top, 8)
         }
         .frame(maxWidth: .infinity, minHeight: 132, alignment: .topLeading)
-        .glassCard(padding: 14, cornerRadius: Metrics.radiusL)
+        .padding(14)
+        .cardSurface(cornerRadius: Metrics.radiusL)
         .opacity(repo.hasWorkflows || repo.isRunning ? 1 : 0.55)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(repo.displayName)，\(subtitle)，\(metricText)")
@@ -81,19 +82,6 @@ struct RepoCardView: View {
         case .failure, .timedOut: return .red
         default: return .secondary
         }
-    }
-
-    private var progressBar: some View {
-        GeometryReader { proxy in
-            ZStack(alignment: .leading) {
-                Capsule().fill(.quaternary)
-                Capsule()
-                    .fill(statusColor)
-                    .frame(width: proxy.size.width * ratio)
-            }
-        }
-        .frame(height: 3)
-        .accessibilityHidden(true)
     }
 
     private var ratio: Double {

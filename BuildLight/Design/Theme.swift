@@ -4,7 +4,7 @@ import SwiftUI
 enum Accent {
     /// 取自 AccentColor 资源，跟随明暗自动切换。
     static let primary = Color.accentColor
-    /// 淡底，用于标签、图标背景。
+    /// 淡底，用于标签、图标背景与顶部柔光。
     static let soft = Color.accentColor.opacity(0.12)
 
     static var gradient: LinearGradient {
@@ -48,17 +48,21 @@ extension Font {
 }
 
 extension View {
-    /// 常规玻璃卡片，用于内容分组。
-    func glassCard(
-        padding: CGFloat = Metrics.m,
-        cornerRadius: CGFloat = Metrics.radiusL
+    /// 卡片底：半透明色块 + 发丝描边。
+    /// 刻意不用 `.glassEffect` / `.ultraThinMaterial`——每张卡都做实时模糊会拖垮滚动。
+    func cardSurface(
+        cornerRadius: CGFloat = Metrics.radiusL,
+        fill: some ShapeStyle = .quaternary.opacity(0.45)
     ) -> some View {
         self
-            .padding(padding)
-            .glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
+            .background(fill, in: .rect(cornerRadius: cornerRadius))
+            .overlay {
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .strokeBorder(.white.opacity(0.06), lineWidth: 0.5)
+            }
     }
 
-    /// 可交互玻璃，用于按钮组和控件。
+    /// 真正的液态玻璃，只留给少量、静止的元素（例如顶部摘要胶囊）。
     func glassInteractive(cornerRadius: CGFloat = Metrics.radiusM) -> some View {
         self.glassEffect(.regular.interactive(), in: .rect(cornerRadius: cornerRadius))
     }

@@ -53,7 +53,8 @@ struct OnboardingView: View {
                 }
             }
             .scrollContentBackground(.hidden)
-            .background { AnimatedBackdrop() }
+            .background { AccentBackdrop() }
+            .background(.background)
             .navigationTitle("连接 GitHub")
         }
         .task { await environment.session.refreshIdentityIfNeeded() }

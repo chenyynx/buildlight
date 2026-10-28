@@ -28,8 +28,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: org.example.buildlight
         PRODUCT_NAME: BuildLight
         GENERATE_INFOPLIST_FILE: YES
-        MARKETING_VERSION: "0.2.0"
-        CURRENT_PROJECT_VERSION: "2"
+        MARKETING_VERSION: "0.3.0"
+        CURRENT_PROJECT_VERSION: "3"
         INFOPLIST_KEY_CFBundleDisplayName: 构建
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES

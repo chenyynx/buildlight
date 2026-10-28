@@ -8,21 +8,10 @@ struct HistoryView: View {
         NavigationStack {
             List {
                 ForEach(groups) { group in
-                    Section {
-                        ForEach(group.runs) { run in
-                            NavigationLink(value: RunRoute(runID: run.id)) {
-                                HistoryRunRow(run: run)
-                            }
-                            .listRowBackground(Rectangle().fill(.ultraThinMaterial))
-                        }
-                    } header: {
-                        HistorySectionHeader(group: group)
-                    }
+                    HistoryRepoGroupView(group: group)
                 }
             }
             .listStyle(.insetGrouped)
-            .scrollContentBackground(.hidden)
-            .background { AnimatedBackdrop() }
             .navigationTitle("历史")
             .navigationDestination(for: RunRoute.self) { route in
                 if let run = runs.first(where: { $0.id == route.runID }) {
@@ -42,13 +31,12 @@ struct HistoryView: View {
     }
 
     private var groups: [HistoryRepoGroup] {
-        let byRepo = Dictionary(grouping: runs, by: \.repoFullName)
-        return byRepo
+        Dictionary(grouping: runs, by: \.repoFullName)
             .map { HistoryRepoGroup(repoFullName: $0.key, runs: $0.value) }
             .sorted { lhs, rhs in
-                let l = lhs.runs.first?.createdAt ?? .distantPast
-                let r = rhs.runs.first?.createdAt ?? .distantPast
-                return l > r
+                let left = lhs.runs.first?.createdAt ?? .distantPast
+                let right = rhs.runs.first?.createdAt ?? .distantPast
+                return left > right
             }
     }
 }

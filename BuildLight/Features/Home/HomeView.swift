@@ -8,6 +8,7 @@ struct HomeView: View {
     @State private var filter: RepoFilter = .all
     @State private var searchText = ""
     @State private var syncError: AppError?
+    @State private var showingSyncError = false
     @State private var didSync = false
 
     private let columns = [
@@ -55,7 +56,8 @@ struct HomeView: View {
                 .padding(.bottom, Metrics.tabBarClearance)
             }
             .scrollIndicators(.hidden)
-            .background { AnimatedBackdrop() }
+            .background { AccentBackdrop() }
+            .background(.background)
             .navigationTitle("构建")
             .searchable(text: $searchText, prompt: "搜索仓库")
             .navigationDestination(for: String.self) { fullName in
@@ -73,6 +75,11 @@ struct HomeView: View {
             .refreshable {
                 await sync()
                 await environment.monitor.refreshNow()
+            }
+            .alert("同步失败", isPresented: $showingSyncError) {
+                Button("好") {}
+            } message: {
+                Text(syncError?.localizedDescription ?? "")
             }
             .task {
                 guard !didSync else { return }
@@ -98,10 +105,12 @@ struct HomeView: View {
         if !keyword.isEmpty {
             result = result.filter { $0.fullName.localizedCaseInsensitiveContains(keyword) }
         }
+        // 按构建活跃度排：在跑的置顶，其余按最近一次运行时间倒序
         return result.sorted { lhs, rhs in
             if lhs.isRunning != rhs.isRunning { return lhs.isRunning }
-            if lhs.latestFailed != rhs.latestFailed { return lhs.latestFailed }
-            return lhs.sortIndex < rhs.sortIndex
+            let left = lhs.latestRun?.updatedAt ?? lhs.addedAt
+            let right = rhs.latestRun?.updatedAt ?? rhs.addedAt
+            return left > right
         }
     }
 
@@ -111,6 +120,7 @@ struct HomeView: View {
             syncError = nil
         } catch {
             syncError = AppError.map(error)
+            showingSyncError = true
         }
     }
 }

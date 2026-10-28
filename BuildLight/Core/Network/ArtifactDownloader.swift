@@ -44,7 +44,7 @@ final class ArtifactDownloader: NSObject, @unchecked Sendable {
                 try? await Task.sleep(for: .seconds(Self.midStallSeconds))
                 guard !Task.isCancelled else { return }
                 guard let task = self.currentTask, !self.finished else { return }
-                let idle = self.lastByteAt.map { $0.durationTime(to: .now) >= .seconds(Self.midStallSeconds) } ?? true
+                let idle = self.lastByteAt.map { $0.duration(to: .now) >= .seconds(Self.midStallSeconds) } ?? true
                 if idle {
                     task.cancel()
                     self.finish(.failure(GitHubError.transport("下载连接中断，请重试")))

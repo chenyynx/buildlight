@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// 仓库卡片。只读 RepoRecord 上的标量快照，
-/// 不做关系遍历、不排序、不碰磁盘——滚动时每帧的代价接近于零。
+/// 不做关系遍历、不排序、不碰磁盘。
 struct RepoCardView: View {
     let repo: RepoRecord
 
@@ -13,11 +13,15 @@ struct RepoCardView: View {
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
                 Spacer(minLength: 0)
-                Circle()
-                    .fill(statusColor)
-                    .frame(width: 7, height: 7)
-                    .padding(.top, 5)
-                    .accessibilityHidden(true)
+                if repo.isRunning {
+                    RunningBadge()
+                } else {
+                    Circle()
+                        .fill(statusColor)
+                        .frame(width: 7, height: 7)
+                        .padding(.top, 5)
+                        .accessibilityHidden(true)
+                }
             }
 
             Text(subtitle)
@@ -39,15 +43,27 @@ struct RepoCardView: View {
                 }
             }
 
+            Text(timeText)
+                .font(.tag)
+                .foregroundStyle(.tertiary)
+                .lineLimit(1)
+                .padding(.top, 2)
+
             CardProgressBar(ratio: progressRatio, color: statusColor)
-                .padding(.top, 8)
+                .padding(.top, 6)
         }
-        .frame(maxWidth: .infinity, minHeight: 132, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: 138, alignment: .topLeading)
         .padding(14)
         .cardSurface(cornerRadius: Metrics.radiusL)
+        .overlay {
+            if repo.isRunning {
+                RoundedRectangle(cornerRadius: Metrics.radiusL)
+                    .strokeBorder(Accent.primary.opacity(0.55), lineWidth: 1)
+            }
+        }
         .opacity(repo.hasWorkflows || repo.isRunning ? 1 : 0.55)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(repo.displayName)，\(subtitle)，\(metricText)")
+        .accessibilityLabel("\(repo.displayName)，\(subtitle)，\(metricText)，\(timeText)")
     }
 
     private var subtitle: String {
@@ -73,6 +89,19 @@ struct RepoCardView: View {
         let end = repo.isRunning ? Date() : (repo.latestRunAt ?? started)
         let total = max(0, Int(end.timeIntervalSince(started)))
         return "\(total / 60):\(String(format: "%02d", total % 60))"
+    }
+
+    /// 「14:02 开始 · 已跑 4:12」/「14:02 开始 · 2 小时前」
+    private var timeText: String {
+        guard let started = repo.latestStartedAt else {
+            return repo.latestRunAt == nil ? "还没有构建过" : "等待 runner"
+        }
+        let start = started.formatted(date: .omitted, time: .shortened)
+        if repo.isRunning {
+            return "\(start) 开始 · 进行中"
+        }
+        let relative = (repo.latestRunAt ?? started).formatted(.relative(presentation: .named))
+        return "\(start) 开始 · \(relative)"
     }
 
     private var statusColor: Color {

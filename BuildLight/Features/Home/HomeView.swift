@@ -17,6 +17,7 @@ struct HomeView: View {
     ]
 
     var body: some View {
+        let items = filteredRepos
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
@@ -29,7 +30,7 @@ struct HomeView: View {
                     }
                     .pickerStyle(.segmented)
 
-                    if filteredRepos.isEmpty {
+                    if items.isEmpty {
                         ContentUnavailableView {
                             Label("没有匹配的仓库", systemImage: "shippingbox")
                         } description: {
@@ -38,16 +39,11 @@ struct HomeView: View {
                         .padding(.top, 40)
                     } else {
                         LazyVGrid(columns: columns, spacing: 12) {
-                            ForEach(filteredRepos) { repo in
+                            ForEach(items) { repo in
                                 NavigationLink(value: repo.fullName) {
                                     RepoCardView(repo: repo)
                                 }
                                 .buttonStyle(.plain)
-                                .contextMenu {
-                                    Button(repo.isHidden ? "取消隐藏" : "隐藏", systemImage: repo.isHidden ? "eye" : "eye.slash") {
-                                        environment.repos.setHidden(!repo.isHidden, for: repo)
-                                    }
-                                }
                             }
                         }
                     }

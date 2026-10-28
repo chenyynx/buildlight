@@ -108,7 +108,6 @@ final class BuildMonitor {
         } catch {
             let mapped = AppError.map(error)
             errors[repo.fullName] = mapped
-            repo.lastCheckedAt = .now
 
             switch mapped {
             case .rateLimited(let resetAt):
@@ -122,7 +121,6 @@ final class BuildMonitor {
             default:
                 nextPollAt[repo.fullName] = Date().addingTimeInterval(retryInterval)
             }
-            try? context.save()
         }
     }
 
@@ -130,14 +128,18 @@ final class BuildMonitor {
         var byID: [Int: RunRecord] = [:]
         for record in repo.runs { byID[record.id] = record }
 
+        var changed = false
         for run in runs {
             if let existing = byID[run.id] {
+                let before = existing.updatedAt
                 existing.apply(run)
+                if existing.updatedAt != before { changed = true }
             } else {
                 let record = RunRecord(from: run, repoFullName: repo.fullName)
                 record.repo = repo
                 context.insert(record)
                 byID[run.id] = record
+                changed = true
             }
         }
 
@@ -150,15 +152,33 @@ final class BuildMonitor {
         let filter = repo.workflowFilter
         let relevant = ordered.filter { filter == nil || filter?.isEmpty == true || $0.workflowName == filter }
         if let latest = relevant.first {
-            repo.latestRunID = latest.id
-            repo.latestRunAt = latest.updatedAt
-            repo.latestStartedAt = latest.startedAt
-            repo.latestStatusRaw = latest.statusRaw
-            repo.latestConclusionRaw = latest.conclusionRaw
-            repo.latestBranch = latest.branch
-            repo.latestWorkflowName = latest.workflowName
-            repo.latestNumber = latest.number
-            repo.activeRunCount = relevant.filter(\.isActive).count
+            let snapshot = (
+                id: latest.id,
+                at: latest.updatedAt,
+                started: latest.startedAt,
+                status: latest.statusRaw,
+                conclusion: latest.conclusionRaw,
+                branch: latest.branch,
+                workflow: latest.workflowName,
+                number: latest.number,
+                active: relevant.filter(\.isActive).count
+            )
+            if repo.latestRunID != snapshot.id
+                || repo.latestRunAt != snapshot.at
+                || repo.latestStatusRaw != snapshot.status
+                || repo.latestConclusionRaw != snapshot.conclusion
+                || repo.activeRunCount != snapshot.active {
+                changed = true
+            }
+            repo.latestRunID = snapshot.id
+            repo.latestRunAt = snapshot.at
+            repo.latestStartedAt = snapshot.started
+            repo.latestStatusRaw = snapshot.status
+            repo.latestConclusionRaw = snapshot.conclusion
+            repo.latestBranch = snapshot.branch
+            repo.latestWorkflowName = snapshot.workflow
+            repo.latestNumber = snapshot.number
+            repo.activeRunCount = snapshot.active
         } else {
             repo.latestRunID = nil
             repo.latestRunAt = nil
@@ -168,8 +188,10 @@ final class BuildMonitor {
             repo.activeRunCount = 0
         }
 
-        repo.lastCheckedAt = .now
-        try? context.save()
+        // 只有真的变了才写库，否则每次轮询都会让 @Query 失效、整张卡片墙重建
+        if changed {
+            try? context.save()
+        }
     }
 
     private func loadArtifacts(for runs: [WorkflowRun], repo: RepoRecord, client: GitHubClient) async {
@@ -190,20 +212,26 @@ final class BuildMonitor {
                 FetchDescriptor<RunRecord>(predicate: #Predicate { $0.id == runID })
             ))?.first
 
+            var artifactsChanged = false
             for artifact in artifacts where !existingIDs.contains(artifact.id) {
                 let record = ArtifactRecord(from: artifact, runID: runID)
                 record.run = runRecord
                 context.insert(record)
+                artifactsChanged = true
             }
 
             // 只有最新一次的产物才写进卡片快照
-            guard runID == repo.latestRunID, let best = bestPackage(in: artifacts) else { continue }
-            repo.packageID = best.id
-            repo.packageName = best.name
-            repo.packageURL = best.archiveDownloadUrl
-            repo.packageSize = best.sizeInBytes
+            if runID == repo.latestRunID, let best = bestPackage(in: artifacts) {
+                if repo.packageID != best.id {
+                    repo.packageID = best.id
+                    repo.packageName = best.name
+                    repo.packageURL = best.archiveDownloadUrl
+                    repo.packageSize = best.sizeInBytes
+                    artifactsChanged = true
+                }
+            }
+            if artifactsChanged { try? context.save() }
         }
-        try? context.save()
     }
 
     private func bestPackage(in artifacts: [Artifact]) -> Artifact? {

@@ -53,8 +53,8 @@ struct RunDetailView: View {
                 }
             }
 
-            if !run.artifacts.isEmpty {
-                Section("构建产物") {
+            if !sortedArtifacts.isEmpty {
+                Section("安装包") {
                     ForEach(sortedArtifacts) { artifact in
                         ArtifactRow(artifact: artifact)
                     }
@@ -85,8 +85,11 @@ struct RunDetailView: View {
 
     // MARK: 计算
 
+    /// 只列安装包。日志、覆盖率之类的产物在这个 App 里没有使用场景。
     private var sortedArtifacts: [ArtifactRecord] {
-        run.artifacts.sorted { $0.sizeBytes > $1.sizeBytes }
+        run.artifacts
+            .filter { PackageFilter.looksLikeIPA($0.name) }
+            .sorted { $0.sizeBytes > $1.sizeBytes }
     }
 
     private var statusText: String {

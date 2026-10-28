@@ -246,12 +246,21 @@ final class BuildMonitor {
             }
 
             // 只有最新一次的产物才写进卡片快照
-            if runID == repo.latestRunID, let best = bestPackage(in: artifacts) {
-                if repo.packageID != best.id {
-                    repo.packageID = best.id
-                    repo.packageName = best.name
-                    repo.packageURL = best.archiveDownloadUrl
-                    repo.packageSize = best.sizeInBytes
+            if runID == repo.latestRunID {
+                if let best = bestPackage(in: artifacts) {
+                    if repo.packageID != best.id {
+                        repo.packageID = best.id
+                        repo.packageName = best.name
+                        repo.packageURL = best.archiveDownloadUrl
+                        repo.packageSize = best.sizeInBytes
+                        artifactsChanged = true
+                    }
+                } else if repo.packageID != nil {
+                    // 之前把非安装包（例如 code-profile）当成了包，这里清掉
+                    repo.packageID = nil
+                    repo.packageName = nil
+                    repo.packageURL = nil
+                    repo.packageSize = 0
                     artifactsChanged = true
                 }
             }
@@ -261,8 +270,12 @@ final class BuildMonitor {
 
     private func bestPackage(in artifacts: [Artifact]) -> Artifact? {
         artifacts
-            .filter { !$0.expired }
-            .max { score($0.name) < score($1.name) }
+            .filter { !$0.expired && PackageFilter.looksLikeIPA($0.name) }
+            .max { lhs, rhs in
+                let left = score(lhs.name)
+                let right = score(rhs.name)
+                return left == right ? lhs.sizeInBytes < rhs.sizeInBytes : left < right
+            }
     }
 
     private func score(_ name: String) -> Int {

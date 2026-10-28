@@ -30,8 +30,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: org.example.buildlight
         PRODUCT_NAME: BuildLight
         GENERATE_INFOPLIST_FILE: YES
-        MARKETING_VERSION: "0.7.0"
-        CURRENT_PROJECT_VERSION: "8"
+        MARKETING_VERSION: "0.7.1"
+        CURRENT_PROJECT_VERSION: "9"
         INFOPLIST_KEY_NSSupportsLiveActivities: YES
         INFOPLIST_KEY_NSSupportsLiveActivitiesFrequentUpdates: YES
         INFOPLIST_KEY_CFBundleDisplayName: BuildLight
@@ -59,8 +59,8 @@ targets:
         PRODUCT_NAME: BuildLightWidgets
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: BuildLightWidgets/Info.plist
-        MARKETING_VERSION: "0.7.0"
-        CURRENT_PROJECT_VERSION: "8"
+        MARKETING_VERSION: "0.7.1"
+        CURRENT_PROJECT_VERSION: "9"
         TARGETED_DEVICE_FAMILY: "1"
         SKIP_INSTALL: YES
         APPLICATION_EXTENSION_API_ONLY: YES

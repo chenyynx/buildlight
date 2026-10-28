@@ -88,9 +88,24 @@ struct RepoDetailView: View {
                 Text(target.name)
                     .font(.subheadline.weight(.medium))
                     .lineLimit(1)
-                Text(packageSizeText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+
+                switch environment.packages.state(for: target.id) {
+                case .downloading(let progress):
+                    Text("下载中 \(Int(progress * 100))% · \(packageSizeText)")
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(Accent.primary)
+                    DownloadProgressBar(progress: progress, height: 3)
+                        .padding(.top, 2)
+                case .unzipping:
+                    Text("正在解压 · \(packageSizeText)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                default:
+                    Text(packageSizeText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Spacer(minLength: 8)

@@ -12,6 +12,16 @@ final class BackgroundDownloadCenter: NSObject, @unchecked Sendable {
     static let shared = BackgroundDownloadCenter()
     static let identifier = "org.example.buildlight.downloads"
     private static let pendingKey = "bg.pending.downloads"
+    private static let availableKey = "bg.download.available"
+    /// 12 秒没有任何字节进来就判定这条通道不可用，之后一律走普通会话。
+    private static let stallSeconds: UInt64 = 12
+
+    /// 某些签名方式下后台会话根本收不到回调（表现为进度恒为 0）。
+    /// 探测到一次无响应就永久降级，避免每次下载都白等 12 秒。
+    static var isAvailable: Bool {
+        get { UserDefaults.standard.object(forKey: availableKey) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: availableKey) }
+    }
 
     struct Pending: Codable {
         let artifactID: Int
@@ -24,6 +34,9 @@ final class BackgroundDownloadCenter: NSObject, @unchecked Sendable {
     private var continuations: [Int: CheckedContinuation<URL, Error>] = [:]
     private var progressHandlers: [Int: @Sendable (Double) -> Void] = [:]
     private var movedURLs: [Int: URL] = [:]
+    private var liveTasks: [Int: URLSessionDownloadTask] = [:]
+    private var watchdogs: [Int: Task<Void, Never>] = [:]
+    private var progressed: [Int: Bool] = [:]
 
     var backgroundCompletionHandler: (() -> Void)?
 
@@ -50,13 +63,36 @@ final class BackgroundDownloadCenter: NSObject, @unchecked Sendable {
             return URL(fileURLWithPath: finished.path)
         }
 
+        guard Self.isAvailable else {
+            throw GitHubError.transport("后台下载不可用")
+        }
+
         return try await withCheckedThrowingContinuation { continuation in
             let task = session.downloadTask(with: request)
             task.taskDescription = "\(artifactID)|\(name)"
+            let taskID = task.taskIdentifier
+
             lock.lock()
-            continuations[task.taskIdentifier] = continuation
-            progressHandlers[task.taskIdentifier] = onProgress
+            continuations[taskID] = continuation
+            progressHandlers[taskID] = onProgress
+            liveTasks[taskID] = task
+            progressed[taskID] = false
             lock.unlock()
+
+            watchdogs[taskID] = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(Self.stallSeconds))
+                guard let self, !Task.isCancelled else { return }
+                self.lock.lock()
+                let pending = self.continuations[taskID] != nil
+                let advanced = self.progressed[taskID] ?? false
+                let live = self.liveTasks[taskID]
+                self.lock.unlock()
+                guard pending, !advanced else { return }
+                Self.isAvailable = false
+                live?.cancel()
+                self.finish(taskID: taskID, result: .failure(GitHubError.transport("后台下载通道无响应")))
+            }
+
             task.resume()
         }
     }
@@ -92,7 +128,11 @@ final class BackgroundDownloadCenter: NSObject, @unchecked Sendable {
         lock.lock()
         let continuation = continuations.removeValue(forKey: taskID)
         progressHandlers.removeValue(forKey: taskID)
+        liveTasks.removeValue(forKey: taskID)
+        progressed.removeValue(forKey: taskID)
+        let watchdog = watchdogs.removeValue(forKey: taskID)
         lock.unlock()
+        watchdog?.cancel()
         continuation?.resume(with: result)
     }
 }
@@ -135,6 +175,7 @@ extension BackgroundDownloadCenter: URLSessionDownloadDelegate {
         guard totalBytesExpectedToWrite > 0 else { return }
         let value = min(max(Double(totalBytesWritten) / Double(totalBytesExpectedToWrite), 0), 1)
         lock.lock()
+        progressed[downloadTask.taskIdentifier] = true
         let handler = progressHandlers[downloadTask.taskIdentifier]
         lock.unlock()
         handler?(value)

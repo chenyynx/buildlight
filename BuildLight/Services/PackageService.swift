@@ -22,6 +22,8 @@ final class PackageService {
 
     private let session: GitHubSession
     private let cache: CacheStore
+    /// 后台通道不响应时的兜底：普通会话 + 真进度。
+    private let fallback = ArtifactDownloader()
 
     init(session: GitHubSession, cache: CacheStore) {
         self.session = session
@@ -51,19 +53,7 @@ final class PackageService {
                 request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
                 request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
 
-                let zipURL = try await BackgroundDownloadCenter.shared.download(
-                    request,
-                    artifactID: target.id,
-                    name: target.name
-                ) { [weak self] progress in
-                    Task { @MainActor [weak self] in
-                        guard let self, case .downloading = self.states[target.id] else { return }
-                        let previous = self.lastProgress[target.id] ?? 0
-                        guard progress >= 1 || progress - previous >= 0.01 else { return }
-                        self.lastProgress[target.id] = progress
-                        self.states[target.id] = .downloading(progress)
-                    }
-                }
+                let zipURL = try await self.download(request, target: target)
 
                 self.states[target.id] = .unzipping
                 let stored = try self.finalize(zipURL: zipURL, id: target.id)
@@ -72,6 +62,34 @@ final class PackageService {
                 self.states[target.id] = .failed(AppError.map(error))
             }
         }
+    }
+
+    /// 先走后台通道；它 12 秒没动静就在内部判死刑并抛错，这里当场换成普通会话，
+    /// 用户不需要再点一次。
+    private func download(_ request: URLRequest, target: PackageTarget) async throws -> URL {
+        let progress: @Sendable (Double) -> Void = { [weak self] value in
+            Task { @MainActor [weak self] in
+                guard let self, case .downloading = self.states[target.id] else { return }
+                let previous = self.lastProgress[target.id] ?? 0
+                guard value >= 1 || value - previous >= 0.01 else { return }
+                self.lastProgress[target.id] = value
+                self.states[target.id] = .downloading(value)
+            }
+        }
+
+        if BackgroundDownloadCenter.isAvailable {
+            do {
+                return try await BackgroundDownloadCenter.shared.download(
+                    request,
+                    artifactID: target.id,
+                    name: target.name,
+                    onProgress: progress
+                )
+            } catch {
+                return try await fallback.download(request, onProgress: progress)
+            }
+        }
+        return try await fallback.download(request, onProgress: progress)
     }
 
     /// App 回到前台时调用：把系统在后台替我们下完的文件解压入库。

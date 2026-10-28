@@ -2,9 +2,6 @@ import SwiftUI
 
 struct OnboardingView: View {
     @Environment(AppEnvironment.self) private var environment
-    @Environment(\.colorScheme) private var colorScheme
-
-    private var palette: Palette { .resolve(colorScheme) }
 
     @State private var token = ""
     @State private var error: AppError?
@@ -34,12 +31,13 @@ struct OnboardingView: View {
 
                 Section {
                     Button {
-                        Task { await submit() }
+                        submit()
                     } label: {
                         HStack {
                             Spacer()
                             if isWorking {
-                                ProgressView().controlSize(.small).padding(.trailing, 6)
+                                ProgressView().controlSize(.small)
+                                    .padding(.trailing, 6)
                             }
                             Text(isWorking ? "验证中…" : "继续")
                             Spacer()
@@ -47,21 +45,29 @@ struct OnboardingView: View {
                     }
                     .disabled(token.isEmpty || isWorking)
                 }
+
+                Section("需要的权限") {
+                    Label("Actions: Read", systemImage: "hammer")
+                    Label("Contents: Read", systemImage: "doc.text")
+                    Label("Metadata: Read", systemImage: "info.circle")
+                }
             }
-            .editorialBackground(palette)
             .navigationTitle("连接 GitHub")
         }
+        .task { await environment.session.refreshIdentityIfNeeded() }
     }
 
-    private func submit() async {
+    private func submit() {
         isWorking = true
         error = nil
-        defer { isWorking = false }
-        do {
-            try await environment.session.signIn(with: token)
-            environment.monitor.start()
-        } catch {
-            self.error = AppError.map(error)
+        Task {
+            defer { isWorking = false }
+            do {
+                try await environment.session.signIn(with: token)
+                environment.monitor.start()
+            } catch {
+                self.error = AppError.map(error)
+            }
         }
     }
 }

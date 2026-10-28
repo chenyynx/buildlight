@@ -22,7 +22,7 @@ struct HomeView: View {
                         NavigationLink(value: repo.fullName) {
                             RepoRow(repo: repo)
                         }
-                        .listRowBackground(.ultraThinMaterial)
+                        .listRowBackground(Rectangle().fill(.ultraThinMaterial))
                     }
                     .onDelete(perform: delete)
                 }
@@ -34,7 +34,7 @@ struct HomeView: View {
                         } description: {
                             Text("点右上角加号，从你有权限的仓库里选")
                         }
-                        .listRowBackground(.ultraThinMaterial)
+                        .listRowBackground(Rectangle().fill(.ultraThinMaterial))
                     }
                 }
             }

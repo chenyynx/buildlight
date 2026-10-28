@@ -145,7 +145,7 @@ final class BackgroundDownloadCenter: NSObject, @unchecked Sendable {
         defer { lock.unlock() }
         let advanced: Bool
         if let at = lastByteAt[taskID] {
-            advanced = at.durationTime(to: .now) < .seconds(Self.midStallSeconds)
+            advanced = at.duration(to: .now) < .seconds(Self.midStallSeconds)
         } else {
             advanced = progressed[taskID] ?? false
         }

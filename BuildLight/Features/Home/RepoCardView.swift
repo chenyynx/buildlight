@@ -33,10 +33,11 @@ struct RepoCardView: View {
             Spacer(minLength: 8)
 
             HStack(alignment: .lastTextBaseline) {
-                Text(metricText)
-                    .font(.metric(.title2))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                RepoDurationText(
+                    startedAt: repo.latestStartedAt,
+                    latestAt: repo.latestRunAt,
+                    isRunning: repo.isRunning
+                )
                 Spacer(minLength: 4)
                 if let target {
                     PackageButton(target: target)
@@ -63,7 +64,7 @@ struct RepoCardView: View {
         }
         .opacity(repo.hasWorkflows || repo.isRunning ? 1 : 0.55)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(repo.displayName)，\(subtitle)，\(metricText)，\(timeText)")
+        .accessibilityLabel("\(repo.displayName)，\(subtitle)，\(timeText)")
     }
 
     private var subtitle: String {
@@ -80,15 +81,6 @@ struct RepoCardView: View {
               let url = repo.packageURL
         else { return nil }
         return PackageTarget(id: id, name: name, archiveURL: url)
-    }
-
-    private var metricText: String {
-        guard let started = repo.latestStartedAt else {
-            return repo.latestRunAt == nil ? "—" : "排队"
-        }
-        let end = repo.isRunning ? Date() : (repo.latestRunAt ?? started)
-        let total = max(0, Int(end.timeIntervalSince(started)))
-        return "\(total / 60):\(String(format: "%02d", total % 60))"
     }
 
     /// 「14:02 开始 · 已跑 4:12」/「14:02 开始 · 2 小时前」

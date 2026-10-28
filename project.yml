@@ -21,15 +21,19 @@ targets:
     platform: iOS
     sources:
       - path: BuildLight
+      - path: Shared
     dependencies:
       - package: ZIPFoundation
+      - target: BuildLightWidgets
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.example.buildlight
         PRODUCT_NAME: BuildLight
         GENERATE_INFOPLIST_FILE: YES
-        MARKETING_VERSION: "0.3.0"
-        CURRENT_PROJECT_VERSION: "3"
+        MARKETING_VERSION: "0.4.0"
+        CURRENT_PROJECT_VERSION: "4"
+        INFOPLIST_KEY_NSSupportsLiveActivities: YES
+        INFOPLIST_KEY_NSSupportsLiveActivitiesFrequentUpdates: YES
         INFOPLIST_KEY_CFBundleDisplayName: 构建
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
@@ -40,6 +44,26 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: ""
+
+  BuildLightWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: BuildLightWidgets
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: org.example.buildlight.widgets
+        PRODUCT_NAME: BuildLightWidgets
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: BuildLightWidgets/Info.plist
+        MARKETING_VERSION: "0.4.0"
+        CURRENT_PROJECT_VERSION: "4"
+        TARGETED_DEVICE_FAMILY: "1"
+        SKIP_INSTALL: YES
+        APPLICATION_EXTENSION_API_ONLY: YES
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: ""
 
@@ -64,6 +88,7 @@ schemes:
     build:
       targets:
         BuildLight: all
+        BuildLightWidgets: all
         BuildLightTests: [test]
     test:
       targets:

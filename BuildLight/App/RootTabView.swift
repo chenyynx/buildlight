@@ -30,5 +30,6 @@ struct RootTabView: View {
                 SettingsView()
             }
         }
+        .background(LiveActivitySync())
     }
 }

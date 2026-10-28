@@ -15,6 +15,9 @@ final class BackgroundDownloadCenter: NSObject, @unchecked Sendable {
     private static let availableKey = "bg.download.available"
     /// 12 秒没有任何字节进来就判定这条通道不可用，之后一律走普通会话。
     private static let stallSeconds: UInt64 = 12
+    /// 传输中途 30 秒没有字节 = 连接死了。S3 的长连接偶尔会静默断掉，
+    /// 不掐的话进度就永远停在中途（用户截图里的 44%）。
+    private static let midStallSeconds: UInt64 = 30
 
     /// 某些签名方式下后台会话根本收不到回调（表现为进度恒为 0）。
     /// 探测到一次无响应就永久降级，避免每次下载都白等 12 秒。
@@ -37,6 +40,7 @@ final class BackgroundDownloadCenter: NSObject, @unchecked Sendable {
     private var liveTasks: [Int: URLSessionDownloadTask] = [:]
     private var watchdogs: [Int: Task<Void, Never>] = [:]
     private var progressed: [Int: Bool] = [:]
+    private var lastByteAt: [Int: ContinuousClock.Instant] = [:]
 
     var backgroundCompletionHandler: (() -> Void)?
 
@@ -80,13 +84,28 @@ final class BackgroundDownloadCenter: NSObject, @unchecked Sendable {
             lock.unlock()
 
             watchdogs[taskID] = Task { [weak self] in
+                // 阶段一：开头 12 秒没响应 → 通道坏了，永久降级
                 try? await Task.sleep(for: .seconds(Self.stallSeconds))
                 guard let self, !Task.isCancelled else { return }
                 let snapshot = self.stallSnapshot(taskID: taskID)
-                guard snapshot.pending, !snapshot.advanced else { return }
-                Self.isAvailable = false
-                snapshot.task?.cancel()
-                self.finish(taskID: taskID, result: .failure(GitHubError.transport("后台下载通道无响应")))
+                guard snapshot.pending else { return }
+                if !snapshot.advanced {
+                    Self.isAvailable = false
+                    snapshot.task?.cancel()
+                    self.finish(taskID: taskID, result: .failure(GitHubError.transport("后台下载通道无响应")))
+                    return
+                }
+                // 阶段二：有进度了，改盯中途停顿
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(Self.midStallSeconds))
+                    guard !Task.isCancelled else { return }
+                    let now = self.stallSnapshot(taskID: taskID)
+                    guard now.pending else { return }
+                    if now.advanced { continue }
+                    now.task?.cancel()
+                    self.finish(taskID: taskID, result: .failure(GitHubError.transport("下载连接中断")))
+                    return
+                }
             }
 
             task.resume()
@@ -124,7 +143,13 @@ final class BackgroundDownloadCenter: NSObject, @unchecked Sendable {
     private func stallSnapshot(taskID: Int) -> (pending: Bool, advanced: Bool, task: URLSessionDownloadTask?) {
         lock.lock()
         defer { lock.unlock() }
-        return (continuations[taskID] != nil, progressed[taskID] ?? false, liveTasks[taskID])
+        let advanced: Bool
+        if let at = lastByteAt[taskID] {
+            advanced = at.durationTime(to: .now) < .seconds(Self.midStallSeconds)
+        } else {
+            advanced = progressed[taskID] ?? false
+        }
+        return (continuations[taskID] != nil, advanced, liveTasks[taskID])
     }
 
     private func finish(taskID: Int, result: Result<URL, Error>) {
@@ -133,6 +158,7 @@ final class BackgroundDownloadCenter: NSObject, @unchecked Sendable {
         progressHandlers.removeValue(forKey: taskID)
         liveTasks.removeValue(forKey: taskID)
         progressed.removeValue(forKey: taskID)
+        lastByteAt.removeValue(forKey: taskID)
         let watchdog = watchdogs.removeValue(forKey: taskID)
         lock.unlock()
         watchdog?.cancel()
@@ -179,6 +205,7 @@ extension BackgroundDownloadCenter: URLSessionDownloadDelegate {
         let value = min(max(Double(totalBytesWritten) / Double(totalBytesExpectedToWrite), 0), 1)
         lock.lock()
         progressed[downloadTask.taskIdentifier] = true
+        lastByteAt[downloadTask.taskIdentifier] = .now
         let handler = progressHandlers[downloadTask.taskIdentifier]
         lock.unlock()
         handler?(value)

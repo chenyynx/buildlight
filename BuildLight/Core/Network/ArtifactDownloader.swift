@@ -7,6 +7,12 @@ final class ArtifactDownloader: NSObject, @unchecked Sendable {
     private var progressHandler: (@Sendable (Double) -> Void)?
     private var finished = false
     private var movedURL: URL?
+    private var currentTask: URLSessionDownloadTask?
+    /// 传输中途 30 秒没有字节 = 连接静默死亡，掐掉让用户重试。
+    private var watchdog: Task<Void, Never>?
+    private var lastByteAt: ContinuousClock.Instant?
+
+    private static let midStallSeconds: UInt64 = 30
 
     private lazy var session: URLSession = {
         let configuration = URLSessionConfiguration.default
@@ -22,13 +28,39 @@ final class ArtifactDownloader: NSObject, @unchecked Sendable {
         progressHandler = onProgress
         return try await withCheckedThrowingContinuation { continuation in
             self.continuation = continuation
-            session.downloadTask(with: request).resume()
+            let task = session.downloadTask(with: request)
+            self.currentTask = task
+            self.startWatchdog()
+            task.resume()
+        }
+    }
+
+    /// 循环检查：只要 30 秒内没有新字节就取消任务并报错。
+    /// didWriteData 会重置时间戳，正常传输永远打不断。
+    private func startWatchdog() {
+        watchdog?.cancel()
+        watchdog = Task { [weak self] in
+            while let self, !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(Self.midStallSeconds))
+                guard !Task.isCancelled else { return }
+                guard let task = self.currentTask, !self.finished else { return }
+                let idle = self.lastByteAt.map { $0.durationTime(to: .now) >= .seconds(Self.midStallSeconds) } ?? true
+                if idle {
+                    task.cancel()
+                    self.finish(.failure(GitHubError.transport("下载连接中断，请重试")))
+                    return
+                }
+                self.lastByteAt = .now
+            }
         }
     }
 
     private func finish(_ result: Result<URL, Error>) {
         guard !finished else { return }
         finished = true
+        currentTask = nil
+        watchdog?.cancel()
+        watchdog = nil
         continuation?.resume(with: result)
         continuation = nil
         progressHandler = nil
@@ -60,6 +92,7 @@ extension ArtifactDownloader: URLSessionDownloadDelegate {
         totalBytesExpectedToWrite: Int64
     ) {
         guard totalBytesExpectedToWrite > 0 else { return }
+        lastByteAt = .now
         let value = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
         progressHandler?(min(max(value, 0), 1))
     }

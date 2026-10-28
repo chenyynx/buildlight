@@ -52,6 +52,8 @@ struct OnboardingView: View {
                     Label("Metadata: Read", systemImage: "info.circle")
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background { AnimatedBackdrop() }
             .navigationTitle("连接 GitHub")
         }
         .task { await environment.session.refreshIdentityIfNeeded() }

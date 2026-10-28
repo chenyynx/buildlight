@@ -22,6 +22,7 @@ struct HomeView: View {
                         NavigationLink(value: repo.fullName) {
                             RepoRow(repo: repo)
                         }
+                        .listRowBackground(.ultraThinMaterial)
                     }
                     .onDelete(perform: delete)
                 }
@@ -33,10 +34,13 @@ struct HomeView: View {
                         } description: {
                             Text("点右上角加号，从你有权限的仓库里选")
                         }
+                        .listRowBackground(.ultraThinMaterial)
                     }
                 }
             }
             .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background { AnimatedBackdrop() }
             .navigationTitle("构建")
             .navigationDestination(for: String.self) { fullName in
                 if let repo = repos.first(where: { $0.fullName == fullName }) {

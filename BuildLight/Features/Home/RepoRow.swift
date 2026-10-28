@@ -22,6 +22,7 @@ struct RepoRow: View {
                 Text(durationText)
                     .font(.callout.monospacedDigit())
                     .foregroundStyle(.secondary)
+                    .contentTransition(.numericText())
                 Text(statusText)
                     .font(.caption)
                     .foregroundStyle(statusColor)

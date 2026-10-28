@@ -84,7 +84,7 @@ struct RepoRow: View {
 
     private var statusColor: Color {
         guard let latest else { return .secondary }
-        if latest.isActive { return .tint }
+        if latest.isActive { return Color.accentColor }
         switch latest.conclusion {
         case .success: return .green
         case .failure, .timedOut: return .red

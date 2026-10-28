@@ -32,7 +32,7 @@ struct StepRow: View {
     }
 
     private var color: Color {
-        if step.status == .inProgress { return .tint }
+        if step.status == .inProgress { return Color.accentColor }
         switch step.conclusion {
         case .success: return .secondary
         case .failure, .timedOut: return .red

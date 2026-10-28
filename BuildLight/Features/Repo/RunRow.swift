@@ -44,7 +44,7 @@ struct RunRow: View {
     }
 
     private var statusColor: Color {
-        if run.isActive { return .tint }
+        if run.isActive { return Color.accentColor }
         switch run.conclusion {
         case .success: return .green
         case .failure, .timedOut: return .red

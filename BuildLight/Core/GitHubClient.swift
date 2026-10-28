@@ -192,9 +192,10 @@ actor GitHubClient {
     }
 
     /// 当前 token 可见的全部仓库，按最近推送排序。
-    func repositories() async throws -> [RepositorySummary] {
+    func repositories(page: Int = 1) async throws -> [RepositorySummary] {
         let data = try await get("/user/repos", query: [
             URLQueryItem(name: "per_page", value: "100"),
+            URLQueryItem(name: "page", value: String(page)),
             URLQueryItem(name: "sort", value: "pushed"),
             URLQueryItem(name: "affiliation", value: "owner,collaborator,organization_member")
         ])

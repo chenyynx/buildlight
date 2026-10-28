@@ -55,12 +55,16 @@ final class BuildMonitor {
         guard let client = session.client else { return }
         if let pausedUntil, Date() < pausedUntil { return }
 
-        let repos = (try? context.fetch(
+        let all = (try? context.fetch(
             FetchDescriptor<RepoRecord>(sortBy: [SortDescriptor(\.sortIndex)])
         )) ?? []
 
         let now = Date()
-        let due = repos.filter { (nextPollAt[$0.fullName] ?? .distantPast) <= now }
+        let due = all
+            .filter { !$0.isHidden }
+            .filter { (nextPollAt[$0.fullName] ?? .distantPast) <= now }
+            .sorted { priority($0) < priority($1) }
+            .prefix(6)
         guard !due.isEmpty else { return }
 
         isRefreshing = true
@@ -74,6 +78,13 @@ final class BuildMonitor {
             nextPollAt[repo.fullName] = now.addingTimeInterval(activeInterval)
             await refresh(repo: repo, client: client)
         }
+    }
+
+    /// 正在跑的最优先，其次是有历史的，最后是还没发现工作流的。
+    private func priority(_ repo: RepoRecord) -> Int {
+        if repo.isRunning { return 0 }
+        if repo.latestRun != nil { return 1 }
+        return 2
     }
 
     /// 手动刷新：忽略退避，立刻拉一轮。
@@ -91,7 +102,15 @@ final class BuildMonitor {
             errors[repo.fullName] = nil
 
             let hasActive = runs.contains(where: \.isActive)
-            nextPollAt[repo.fullName] = Date().addingTimeInterval(hasActive ? activeInterval : idleInterval)
+            let hasHistory = !runs.isEmpty
+            repo.hasWorkflows = hasHistory
+
+            if !hasHistory {
+                // 没有任何 Actions 记录的仓库，一小时后再看一次
+                nextPollAt[repo.fullName] = Date().addingTimeInterval(3600)
+            } else {
+                nextPollAt[repo.fullName] = Date().addingTimeInterval(hasActive ? activeInterval : idleInterval)
+            }
 
             await loadArtifacts(for: Array(runs.prefix(3)), repo: repo, client: client)
         } catch {
@@ -105,6 +124,9 @@ final class BuildMonitor {
                 nextPollAt[repo.fullName] = resetAt ?? Date().addingTimeInterval(300)
             case .unauthorized:
                 nextPollAt[repo.fullName] = Date().addingTimeInterval(600)
+            case .notFound:
+                repo.hasWorkflows = false
+                nextPollAt[repo.fullName] = Date().addingTimeInterval(3600)
             default:
                 nextPollAt[repo.fullName] = Date().addingTimeInterval(retryInterval)
             }

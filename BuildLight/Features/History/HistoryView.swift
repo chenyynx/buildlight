@@ -11,15 +11,18 @@ struct HistoryView: View {
                     Section {
                         ForEach(group.runs) { run in
                             NavigationLink(value: RunRoute(runID: run.id)) {
-                                RunRow(run: run)
+                                HistoryRunRow(run: run)
                             }
+                            .listRowBackground(Rectangle().fill(.ultraThinMaterial))
                         }
                     } header: {
-                        Text(group.day, format: .dateTime.month(.wide).day())
+                        HistorySectionHeader(group: group)
                     }
                 }
             }
             .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background { AnimatedBackdrop() }
             .navigationTitle("历史")
             .navigationDestination(for: RunRoute.self) { route in
                 if let run = runs.first(where: { $0.id == route.runID }) {
@@ -38,11 +41,14 @@ struct HistoryView: View {
         }
     }
 
-    private var groups: [HistoryDayGroup] {
-        let calendar = Calendar.current
-        let grouped = Dictionary(grouping: runs) { calendar.startOfDay(for: $0.createdAt) }
-        return grouped
-            .map { HistoryDayGroup(day: $0.key, runs: $0.value) }
-            .sorted { $0.day > $1.day }
+    private var groups: [HistoryRepoGroup] {
+        let byRepo = Dictionary(grouping: runs, by: \.repoFullName)
+        return byRepo
+            .map { HistoryRepoGroup(repoFullName: $0.key, runs: $0.value) }
+            .sorted { lhs, rhs in
+                let l = lhs.runs.first?.createdAt ?? .distantPast
+                let r = rhs.runs.first?.createdAt ?? .distantPast
+                return l > r
+            }
     }
 }

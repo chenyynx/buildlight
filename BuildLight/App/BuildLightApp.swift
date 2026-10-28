@@ -28,15 +28,11 @@ struct BuildLightApp: App {
 struct RootView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.scenePhase) private var scenePhase
-    @Query private var trackedRepos: [RepoRecord]
 
     var body: some View {
         Group {
             if !environment.session.isSignedIn {
                 OnboardingView()
-            } else if trackedRepos.isEmpty {
-                // 已登录但还没选仓库：直接进选择页，不让用户手打仓库名
-                RepoPickerView(isOnboarding: true)
             } else {
                 RootTabView()
             }

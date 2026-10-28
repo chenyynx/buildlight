@@ -14,6 +14,10 @@ final class RepoRecord {
     var sortIndex: Int
     var addedAt: Date
     var lastCheckedAt: Date?
+    /// 是否已经发现过工作流记录。没记录的仓库只做低频探测。
+    var hasWorkflows: Bool = false
+    /// 用户手动隐藏的仓库。
+    var isHidden: Bool = false
 
     @Relationship(deleteRule: .cascade, inverse: \RunRecord.repo)
     var runs: [RunRecord] = []

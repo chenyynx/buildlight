@@ -16,11 +16,17 @@ struct PackageButton: View {
             .buttonStyle(.bordered)
             .buttonBorderShape(.circle)
 
-        case .downloading, .unzipping:
+        case .downloading(let progress):
+            ProgressView(value: progress)
+                .progressViewStyle(.circular)
+                .frame(width: 26, height: 26)
+                .accessibilityLabel("下载中 \(Int(progress * 100))%")
+
+        case .unzipping:
             ProgressView()
                 .controlSize(.small)
                 .frame(width: 30, height: 30)
-                .accessibilityLabel("正在准备构建产物")
+                .accessibilityLabel("正在解压")
 
         case .ready(let url):
             ShareLink(item: url) {

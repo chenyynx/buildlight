@@ -6,7 +6,6 @@ struct SettingsView: View {
     @Query(sort: \RepoRecord.sortIndex) private var repos: [RepoRecord]
 
     @State private var showingSignOutConfirmation = false
-    @State private var showingPicker = false
 
     var body: some View {
         NavigationStack {
@@ -29,8 +28,8 @@ struct SettingsView: View {
                             }
                         }
                     }
-                    Button("添加仓库", systemImage: "plus") {
-                        showingPicker = true
+                    Button("同步全部仓库", systemImage: "arrow.triangle.2.circlepath") {
+                        Task { try? await environment.repos.syncAll() }
                     }
                 } header: {
                     Text("跟踪的仓库（\(repos.count)）")
@@ -39,8 +38,10 @@ struct SettingsView: View {
                 }
 
                 Section("缓存") {
-                    Button("清理已下载的产物") {
-                        environment.packages.purgeReadyFiles()
+                    NavigationLink {
+                        CacheView()
+                    } label: {
+                        LabeledContent("已下载的包", value: "\(environment.cache.entries.count) 个 · \(environment.cache.totalSizeText)")
                     }
                     LabeledContent("轮询状态", value: environment.monitor.isRefreshing ? "刷新中" : "空闲")
                     if let last = environment.monitor.lastRefreshAt {
@@ -57,9 +58,6 @@ struct SettingsView: View {
                 if let repo = repos.first(where: { $0.fullName == fullName }) {
                     RepoDetailView(repo: repo)
                 }
-            }
-            .sheet(isPresented: $showingPicker) {
-                RepoPickerView()
             }
             .confirmationDialog("退出后需要重新填写 Token", isPresented: $showingSignOutConfirmation) {
                 Button("退出登录", role: .destructive) {

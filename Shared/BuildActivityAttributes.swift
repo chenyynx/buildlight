@@ -8,6 +8,11 @@ struct BuildActivityAttributes: ActivityAttributes {
         var running: [RunningBuild]
         var finishedCount: Int
         var failedCount: Int
+        /// 当前强调色（浅色 / 深色两种取值，十六进制）。
+        /// 锁屏组件拿不到 App 的环境，只能由 App 在更新时带过来；
+        /// 留 optional 是为了兼容已经存在的旧 Activity 状态。
+        var accentLightHex: String?
+        var accentDarkHex: String?
     }
 
     var title: String

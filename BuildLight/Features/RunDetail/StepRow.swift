@@ -6,6 +6,7 @@ import SwiftUI
 /// 成功是中性空心圈——形状本身带信息，
 /// 这样「不使用颜色区分」的用户也能读懂。
 struct StepRow: View {
+    @Environment(\.accent) private var accent
     let step: WorkflowStep
 
     var body: some View {
@@ -32,7 +33,7 @@ struct StepRow: View {
     private var glyph: some View {
         switch step.status {
         case .inProgress:
-            PulsingDot(color: StatusTone.running, size: 5)
+            PulsingDot(color: accent.primary, size: 5)
         case .completed:
             if isFailed {
                 Image(systemName: "xmark")

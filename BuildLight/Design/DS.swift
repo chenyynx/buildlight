@@ -6,7 +6,7 @@ import SwiftUI
 /// - 左右边距 20，分组标题 11pt 宽字距
 /// - 数字一律等宽（monospacedDigit），避免跳动
 /// - 分隔用 0.5pt 发丝线，不用卡片、不用阴影
-/// - 状态用系统标准色：橙=在跑，红=失败，绿=就绪
+/// - 在跑=强调色，失败=系统红，就绪=系统绿
 enum DS {
     static let pad: CGFloat = 22
     static let rowVertical: CGFloat = 13

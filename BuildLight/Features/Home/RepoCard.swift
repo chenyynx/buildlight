@@ -121,7 +121,7 @@ struct RepoCard: View {
         switch packageState {
         case .ready: StatusTone.success
         case .failed: StatusTone.failed
-        case .downloading, .paused, .unzipping: StatusTone.running
+        case .downloading, .paused, .unzipping: accent.primary
         default: accent.primary
         }
     }
@@ -182,7 +182,7 @@ struct RepoCard: View {
     }
 
     private var tone: Color? {
-        if repo.isRunning { return StatusTone.running }
+        if repo.isRunning { return accent.primary }
         if repo.latestFailed { return StatusTone.failed }
         return nil
     }
@@ -198,7 +198,7 @@ struct StatusGlyph: View {
     var body: some View {
         Group {
             if repo.isRunning {
-                PulsingDot(color: StatusTone.running, size: 6)
+                PulsingDot(color: accent.primary, size: 6)
             } else if repo.latestFailed {
                 Image(systemName: "xmark")
                     .font(.system(size: 9, weight: .black))

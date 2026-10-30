@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// 七款可切换的强调色。
 ///
@@ -52,6 +53,22 @@ enum AccentTheme: String, CaseIterable, Identifiable, Sendable {
         case .lime: Color(hex: 0xC2DC58)
         case .copper: Color(hex: 0xE8A06A)
         }
+    }
+
+    /// 浅色模式主色的十六进制串，供锁屏组件使用。
+    var lightHex: String { Self.hex(light) }
+
+    /// 深色模式主色的十六进制串。
+    var darkHex: String { Self.hex(dark) }
+
+    private static func hex(_ color: Color) -> String {
+        let ui = UIColor(color)
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        guard ui.getRed(&r, green: &g, blue: &b, alpha: &a) else { return "3A5BD0" }
+        return String(format: "%02X%02X%02X",
+                      Int((r * 255).rounded()),
+                      Int((g * 255).rounded()),
+                      Int((b * 255).rounded()))
     }
 
     func primary(for scheme: ColorScheme) -> Color {

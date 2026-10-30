@@ -7,6 +7,7 @@ import SwiftData
 /// 但之前一个入口都没有——用户把仓库隐藏了就再也找不回来。
 /// 这一页把这些能力补齐：增删、隐藏/恢复、排序、限定工作流。
 struct RepoListView: View {
+    @Environment(\.accent) private var accent
     @Environment(AppEnvironment.self) private var environment
     @Query(sort: \RepoRecord.sortIndex) private var repos: [RepoRecord]
 
@@ -155,7 +156,7 @@ private struct RepoManageRow: View {
     var body: some View {
         HStack(spacing: 10) {
             if repo.isRunning {
-                PulsingDot(color: StatusTone.running, size: 5)
+                PulsingDot(color: accent.primary, size: 5)
             } else if repo.latestFailed {
                 Image(systemName: "xmark")
                     .font(.system(size: 8, weight: .black))

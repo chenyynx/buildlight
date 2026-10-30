@@ -3,6 +3,7 @@ import SwiftUI
 import SwiftData
 
 struct SettingsView: View {
+    @Environment(\.accent) private var accent
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.openURL) private var openURL
     @Environment(\.colorScheme) private var colorScheme
@@ -75,7 +76,7 @@ struct SettingsView: View {
 
                         FunctionRow(
                             systemImage: "antenna.radiowaves.left.and.right",
-                            tint: StatusTone.running,
+                            tint: accent.primary,
                             title: "轮询状态",
                             value: environment.monitor.isRefreshing ? "刷新中" : "空闲"
                         )

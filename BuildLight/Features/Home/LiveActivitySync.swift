@@ -4,6 +4,7 @@ import SwiftUI
 /// 把「谁在跑」同步到锁屏实时活动。
 /// 挂零尺寸视图，不参与布局；签名不变就不触发同步。
 struct LiveActivitySync: View {
+    @Environment(AppEnvironment.self) private var environment
     @Query(sort: \RepoRecord.sortIndex) private var repos: [RepoRecord]
 
     var body: some View {
@@ -13,7 +14,8 @@ struct LiveActivitySync: View {
     }
 
     private var signature: String {
-        repos
+        let theme = environment.appearance.theme.rawValue
+        return theme + "#" + repos
             .map { "\($0.fullName):\($0.activeRunCount):\($0.latestStartedAt?.timeIntervalSince1970 ?? 0)" }
             .joined(separator: "|")
     }
@@ -31,10 +33,13 @@ struct LiveActivitySync: View {
                 )
             }
         let failed = repos.filter(\.latestFailed).count
+        let theme = environment.appearance.theme
         await BuildActivityController.shared.sync(
             running: Array(running),
             finishedCount: 0,
-            failedCount: failed
+            failedCount: failed,
+            accentLightHex: theme.lightHex,
+            accentDarkHex: theme.darkHex
         )
     }
 }

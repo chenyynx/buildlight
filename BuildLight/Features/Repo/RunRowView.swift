@@ -2,6 +2,7 @@ import SwiftUI
 
 /// 一条构建记录。首页之外的所有列表都用它。
 struct RunRowView: View {
+    @Environment(\.accent) private var accent
     let run: RunRecord
 
     var body: some View {
@@ -36,7 +37,7 @@ struct RunRowView: View {
     private var statusDot: some View {
         Group {
             if run.isActive {
-                PulsingDot(color: StatusTone.running, size: 5)
+                PulsingDot(color: accent.primary, size: 5)
             } else if isFailed {
                 Image(systemName: "xmark")
                     .font(.system(size: 8, weight: .black))
@@ -85,7 +86,7 @@ struct RunRowView: View {
     }
 
     private var tone: Color? {
-        if run.isActive { return StatusTone.running }
+        if run.isActive { return accent.primary }
         if isFailed { return StatusTone.failed }
         return nil
     }

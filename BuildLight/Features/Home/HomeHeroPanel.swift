@@ -32,7 +32,7 @@ struct HomeHeroPanel: View {
                 HStack(spacing: 0) {
                     MetricCell(value: "\(readyCount)", label: "可安装", tint: readyCount > 0 ? accent.primary : nil)
                     VerticalRule()
-                    MetricCell(value: "\(runningCount)", label: "在跑", tint: runningCount > 0 ? StatusTone.running : nil)
+                    MetricCell(value: "\(runningCount)", label: "在跑", tint: runningCount > 0 ? accent.primary : nil)
                     VerticalRule()
                     MetricCell(value: "\(failedCount)", label: "失败", tint: failedCount > 0 ? StatusTone.failed : nil)
                     VerticalRule()

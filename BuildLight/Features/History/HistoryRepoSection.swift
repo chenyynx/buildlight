@@ -7,6 +7,7 @@ import SwiftUI
 /// 折叠后一屏能看到六七个仓库的最新状态，点开才展开明细——
 /// 这是「先定位仓库，再看记录」的自然顺序。
 struct HistoryRepoSection: View {
+    @Environment(\.accent) private var accent
     let group: HistoryRepoGroup
     @Binding var expandedRepoIDs: Set<String>
 
@@ -86,7 +87,7 @@ struct HistoryRepoSection: View {
     private var statusDot: some View {
         Group {
             if latest?.isActive == true {
-                PulsingDot(color: StatusTone.running, size: 5)
+                PulsingDot(color: accent.primary, size: 5)
             } else if latest.map(isFailed) == true {
                 Image(systemName: "xmark")
                     .font(.system(size: 8, weight: .black))

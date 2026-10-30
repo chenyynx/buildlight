@@ -19,7 +19,13 @@ final class BuildActivityController {
         activity = Activity<BuildActivityAttributes>.activities.first
     }
 
-    func sync(running: [RunningBuild], finishedCount: Int, failedCount: Int) async {
+    func sync(
+        running: [RunningBuild],
+        finishedCount: Int,
+        failedCount: Int,
+        accentLightHex: String? = nil,
+        accentDarkHex: String? = nil
+    ) async {
         guard enabled else { return }
 
         guard !running.isEmpty else {
@@ -30,7 +36,9 @@ final class BuildActivityController {
         let state = BuildActivityAttributes.ContentState(
             running: running,
             finishedCount: finishedCount,
-            failedCount: failedCount
+            failedCount: failedCount,
+            accentLightHex: accentLightHex,
+            accentDarkHex: accentDarkHex
         )
         // 3 分钟收不到更新就让系统把它置灰：App 挂起后没人能结束它，
         // 不设过期的话锁屏上的计时会一直往下走，看着像构建永远跑不完。

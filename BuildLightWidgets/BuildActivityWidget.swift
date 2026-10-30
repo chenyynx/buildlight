@@ -5,7 +5,7 @@ import WidgetKit
 /// 锁屏 / 灵动岛实时活动。
 ///
 /// 设计原则与 App 内一致：
-/// - 状态色用系统标准色（橙=进行中、红=失败），不手调
+/// - 「进行中」用用户选的强调色（由 App 写进 ContentState），不是固定橙色
 /// - 信息优先级：谁在跑 > 跑了多久 > 分支
 /// - 锁屏是「扫一眼」的场景，一行一个仓库，不做卡片嵌套
 struct BuildActivityWidget: Widget {
@@ -13,24 +13,27 @@ struct BuildActivityWidget: Widget {
         ActivityConfiguration(for: BuildActivityAttributes.self) { context in
             LockScreenBuildView(state: context.state)
                 .activityBackgroundTint(Color.black.opacity(0.35))
-                .activitySystemActionForegroundColor(BuildLightPalette.running)
+                .activitySystemActionForegroundColor(
+                    context.state.accent(for: .dark)
+                )
         } dynamicIsland: { context in
+            let accent = context.state.accent(for: .dark)
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     Label("构建中", systemImage: "hammer.fill")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(BuildLightPalette.running)
+                        .foregroundStyle(accent)
                         .padding(.leading, 2)
                 }
 
                 DynamicIslandExpandedRegion(.trailing) {
-                    CountBadge(count: context.state.running.count)
+                    CountBadge(count: context.state.running.count, accent: accent)
                 }
 
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(alignment: .leading, spacing: 7) {
                         ForEach(context.state.running.prefix(3)) { build in
-                            IslandBuildRow(build: build)
+                            IslandBuildRow(build: build, accent: accent)
                         }
 
                         if context.state.running.count > 3 {
@@ -44,16 +47,16 @@ struct BuildActivityWidget: Widget {
                 }
             } compactLeading: {
                 Image(systemName: "hammer.fill")
-                    .foregroundStyle(BuildLightPalette.running)
+                    .foregroundStyle(accent)
             } compactTrailing: {
                 Text("\(context.state.running.count)")
                     .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(BuildLightPalette.running)
+                    .foregroundStyle(accent)
             } minimal: {
                 Image(systemName: "hammer.fill")
-                    .foregroundStyle(BuildLightPalette.running)
+                    .foregroundStyle(accent)
             }
-            .keylineTint(BuildLightPalette.running)
+            .keylineTint(accent)
         }
     }
 }
@@ -63,13 +66,17 @@ struct BuildActivityWidget: Widget {
 private struct LockScreenBuildView: View {
     let state: BuildActivityAttributes.ContentState
 
+    @Environment(\.colorScheme) private var scheme
+
+    private var accent: Color { state.accent(for: scheme) }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             header
 
             VStack(spacing: 8) {
                 ForEach(state.running.prefix(3)) { build in
-                    LockScreenBuildRow(build: build)
+                    LockScreenBuildRow(build: build, accent: accent)
                 }
             }
 
@@ -86,7 +93,7 @@ private struct LockScreenBuildView: View {
         HStack(spacing: 6) {
             // 一个会呼吸的圆点，比静态图标更能说明「还在动」
             Circle()
-                .fill(BuildLightPalette.running)
+                .fill(accent)
                 .frame(width: 7, height: 7)
 
             Text("构建中")
@@ -95,13 +102,14 @@ private struct LockScreenBuildView: View {
 
             Spacer(minLength: 8)
 
-            CountBadge(count: state.running.count)
+            CountBadge(count: state.running.count, accent: accent)
         }
     }
 }
 
 private struct LockScreenBuildRow: View {
     let build: RunningBuild
+    let accent: Color
 
     var body: some View {
         HStack(spacing: 10) {
@@ -121,7 +129,7 @@ private struct LockScreenBuildRow: View {
 
             Text(timerInterval: build.startedAt...Date.distantFuture, countsDown: false)
                 .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                .foregroundStyle(BuildLightPalette.running)
+                .foregroundStyle(accent)
                 .monospacedDigit()
         }
     }
@@ -129,6 +137,7 @@ private struct LockScreenBuildRow: View {
 
 private struct IslandBuildRow: View {
     let build: RunningBuild
+    let accent: Color
 
     var body: some View {
         HStack(spacing: 8) {
@@ -138,7 +147,7 @@ private struct IslandBuildRow: View {
             Spacer(minLength: 8)
             Text(timerInterval: build.startedAt...Date.distantFuture, countsDown: false)
                 .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                .foregroundStyle(BuildLightPalette.running)
+                .foregroundStyle(accent)
                 .monospacedDigit()
         }
     }
@@ -147,13 +156,31 @@ private struct IslandBuildRow: View {
 /// 数量胶囊。没有在跑时整体变灰，不抢注意力。
 private struct CountBadge: View {
     let count: Int
+    let accent: Color
 
     var body: some View {
         Text("\(count)")
             .font(.system(size: 12, weight: .semibold, design: .monospaced))
-            .foregroundStyle(count > 0 ? BuildLightPalette.running : .secondary)
+            .foregroundStyle(count > 0 ? accent : .secondary)
             .padding(.horizontal, 8)
             .frame(height: 20)
             .background(.quaternary.opacity(0.5), in: .capsule)
+    }
+}
+
+
+extension BuildActivityAttributes.ContentState {
+    /// 从 App 传来的十六进制值还原成当前外观下的强调色。
+    /// 深色锁屏用 darkHex，浅色用 lightHex；都没有就退回默认靛蓝。
+    func accent(for scheme: ColorScheme) -> Color {
+        let hex = scheme == .dark ? accentDarkHex : accentLightHex
+        guard let hex, hex.count == 6, let value = UInt32(hex, radix: 16) else {
+            return BuildLightPalette.fallbackAccent
+        }
+        return Color(
+            red: Double((value >> 16) & 0xFF) / 255,
+            green: Double((value >> 8) & 0xFF) / 255,
+            blue: Double(value & 0xFF) / 255
+        )
     }
 }

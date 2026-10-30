@@ -118,7 +118,7 @@ struct RunDetailView: View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(elapsed(now: now))
                 .font(.system(size: 34, weight: .semibold).monospacedDigit())
-                .foregroundStyle(run.isActive ? StatusTone.running : .primary)
+                .foregroundStyle(run.isActive ? accent.primary : .primary)
             Text(run.isActive ? (run.startedAt == nil ? "排队中" : "进行中") : "总耗时")
                 .font(.system(size: 11))
                 .foregroundStyle(.tertiary)
@@ -192,7 +192,7 @@ struct RunDetailView: View {
     }
 
     private var tone: Color {
-        if run.isActive { return StatusTone.running }
+        if run.isActive { return accent.primary }
         switch run.conclusion {
         case .failure, .timedOut: return StatusTone.failed
         default: return StatusTone.idle

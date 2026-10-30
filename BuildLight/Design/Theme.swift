@@ -1,27 +1,26 @@
 import SwiftUI
 
-/// 品牌色：只在交互元素上用（按钮、选中态、链接），不参与状态表达。
+/// 状态色。
 ///
-/// 强调色由用户在设置页切换，共七款；具体值在 `AccentTheme`。
-/// 视图通过环境变量 `@Environment(\.accent)` 取当前值，
-/// 不要直接引用 `Accent.primary` 这样的全局常量。
-/// 状态色：直接用系统标准色，不手调色值。
+/// **「进行中」跟随强调色**：它是 App 里最常驻的状态（呼吸点、计时数字、
+/// 卡片底边的光带），用一个固定的橙色会和用户选的强调色长期打架——
+/// 选靛蓝时橙点显得脏，选湖蓝时又像两种品牌色。
+/// 进行中本身就是「主交互状态」，用强调色是语义上最正确的选择。
 ///
-/// 为什么要用系统色：
-/// - 随系统外观、增强对比度、色彩滤镜自动适配
-/// - 和系统控件（通知、设置里的红点）是同一个红，不会"两套红"
-/// - 之前手调的琥珀 #B4691F / 砖红 #A63A2E 在深色模式下偏脏，也正是这个原因
+/// 失败 / 就绪仍然是系统语义色：
+/// - 失败 = `.red`，就绪 = `.green`
+/// 它们与强调色无关，因为「出事了」和「可以装了」必须永远同一个颜色。
 ///
-/// 语义映射：
-/// - 进行中 = `.orange`（系统橙，表示"正在发生"）
-/// - 失败   = `.red`（系统红）
-/// - 成功   = `.green`（只在需要明确肯定时用，列表里仍保持安静）
-/// - 静默   = `.secondary`
+/// 用法：视图里用 `StatusTone.running(accent)`，不要写死颜色。
 enum StatusTone {
-    static let running = Color.orange
     static let failed = Color.red
     static let success = Color.green
     static let idle = Color.secondary
+
+    /// 进行中的颜色 = 当前强调色。
+    static func running(_ accent: Accent) -> Color {
+        accent.primary
+    }
 }
 
 enum Metrics {

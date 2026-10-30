@@ -22,7 +22,7 @@ struct AccentThemePicker: View {
                 }
             }
 
-            Text("强调色只影响按钮、选中态和进度；构建状态用系统标准色（橙 / 红），不跟强调色变。")
+            Text("强调色同时用于「进行中」的呼吸点、计时和进度光带。失败和可安装始终用系统红 / 绿。")
                 .font(.system(size: 11.5))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

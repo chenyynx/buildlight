@@ -9,6 +9,8 @@ import SwiftData
 final class BuildMonitor {
     private let context: ModelContext
     private let session: GitHubSession
+    /// 只用来同步下载进度的内存快照，不参与轮询逻辑。
+    private weak var packages: PackageService?
 
     private var nextPollAt: [String: Date] = [:]
     /// 每个仓库「最近一次失败」+「最近一次成功」，用来判断这个错误是不是过期了。
@@ -41,11 +43,15 @@ final class BuildMonitor {
     private let idleInterval: TimeInterval = 60
     private let retryInterval: TimeInterval = 20
     private let historyLimit = 30
-    private let maxReposPerTick = 6
+    private nonisolated static let fetchRunLimit = 30
+    private let maxReposPerTick = 12
+    /// 同时在途的仓库刷新数。太高会顶到二级限流，太低又退化成串行。
+    private let maxConcurrentRefreshes = 4
 
-    init(context: ModelContext, session: GitHubSession) {
+    init(context: ModelContext, session: GitHubSession, packages: PackageService? = nil) {
         self.context = context
         self.session = session
+        self.packages = packages
     }
 
     // MARK: 生命周期
@@ -56,9 +62,20 @@ final class BuildMonitor {
             while !Task.isCancelled {
                 guard let self else { return }
                 await self.tick()
-                try? await Task.sleep(for: .seconds(1))
+                // 按「下一个仓库什么时候到期」决定睡多久。
+                // 固定 1 秒会在全空闲时也每秒唤醒，白白耗电。
+                let interval = await self.nextSleepInterval()
+                try? await Task.sleep(for: .seconds(interval))
             }
         }
+    }
+
+    /// 到下一个仓库该刷新的时间，钳在 0.5s…5s。
+    private func nextSleepInterval() -> TimeInterval {
+        let now = Date.now
+        let due = nextPollAt.values.filter { $0 > now }.map { $0.timeIntervalSince(now) }
+        guard let soonest = due.min() else { return 5 }
+        return min(max(soonest, 0.5), 5)
     }
 
     func stop() {
@@ -95,9 +112,49 @@ final class BuildMonitor {
             lastRefreshAt = .now
         }
 
-        for repo in due {
+        // 网络请求并发跑（上限 4），落库仍然回到主线程串行。
+        // 之前是一个接一个 await，21 个仓库刷新要等 21 个 RTT 累加。
+        let repos = Array(due)
+        for repo in repos {
             nextPollAt[repo.fullName] = now.addingTimeInterval(activeInterval)
-            await refresh(repo: repo, client: client)
+        }
+
+        // 按「波」并发拉数据，落库仍然在主线程串行。
+        //
+        // 注意：`RepoRecord` 是 SwiftData 的 @Model，不是 Sendable，
+        // 不能直接塞进 TaskGroup。所以并行任务只负责「拿数据」，
+        // 返回纯 Sendable 的 (fullName, runs) 结果，再由主线程统一写入。
+        var index = 0
+        while index < repos.count {
+            let end = min(index + maxConcurrentRefreshes, repos.count)
+            let batch = Array(repos[index..<end])
+            let targets = batch.map {
+                (fullName: $0.fullName, owner: $0.owner, name: $0.name)
+            }
+
+            let results = await withTaskGroup(
+                of: RepoFetchResult.self,
+                returning: [RepoFetchResult].self
+            ) { group in
+                for target in targets {
+                    group.addTask {
+                        await Self.fetchRuns(for: target, client: client)
+                    }
+                }
+                var collected: [RepoFetchResult] = []
+                for await result in group {
+                    collected.append(result)
+                }
+                return collected
+            }
+
+            // 回到主线程逐条落库
+            let byName = Dictionary(uniqueKeysWithValues: batch.map { ($0.fullName, $0) })
+            for result in results {
+                guard let repo = byName[result.fullName] else { continue }
+                apply(result, to: repo)
+            }
+            index = end
         }
     }
 
@@ -188,41 +245,67 @@ final class BuildMonitor {
 
     // MARK: 单个仓库
 
-    private func refresh(repo: RepoRecord, client: GitHubClient) async {
+    // MARK: 网络（可在任意线程执行，只带回 Sendable 数据）
+
+    private struct RepoFetchResult: Sendable {
+        let fullName: String
+        let runs: [WorkflowRun]
+        /// runID → 该 run 的产物。只带最新两条，省配额。
+        let artifacts: [Int: [Artifact]]
+        let error: AppError?
+    }
+
+    private nonisolated static func fetchRuns(
+        for target: (fullName: String, owner: String, name: String),
+        client: GitHubClient
+    ) async -> RepoFetchResult {
         do {
-            let runs = try await client.runs(owner: repo.owner, repo: repo.name, perPage: historyLimit)
-            // 必须在 apply 之前取：apply 里会把这个仓库标记成「已见过」，
-            // 之后再判断就永远是 true，于是装完 App 会把历史包全推一遍。
-            let wasPrimed = primedRepos.contains(repo.fullName)
-            apply(runs: runs, to: repo)
-            lastSuccess[repo.fullName] = .now
-            lastFailure[repo.fullName] = nil
+            let runs = try await client.runs(
+                owner: target.owner,
+                repo: target.name,
+                perPage: Self.fetchRunLimit
+            )
 
-            let hasActive = runs.contains(where: \.isActive)
-            repo.hasWorkflows = !runs.isEmpty
-
-            if runs.isEmpty {
-                nextPollAt[repo.fullName] = Date().addingTimeInterval(3600)
-            } else {
-                nextPollAt[repo.fullName] = Date().addingTimeInterval(hasActive ? activeInterval : idleInterval)
+            var artifacts: [Int: [Artifact]] = [:]
+            for run in runs.prefix(2) {
+                if let list = try? await client.artifacts(
+                    owner: target.owner,
+                    repo: target.name,
+                    runID: run.id
+                ) {
+                    artifacts[run.id] = list
+                }
             }
 
-            await loadArtifacts(
-                for: Array(runs.prefix(2)),
-                repo: repo,
-                client: client,
-                announce: wasPrimed
+            return RepoFetchResult(
+                fullName: target.fullName,
+                runs: runs,
+                artifacts: artifacts,
+                error: nil
             )
         } catch {
-            let mapped = AppError.map(error)
+            return RepoFetchResult(
+                fullName: target.fullName,
+                runs: [],
+                artifacts: [:],
+                error: AppError.map(error)
+            )
+        }
+    }
+
+    // MARK: 落库（只在主线程）
+
+    /// 把一次拉取结果写进本地库，并维护卡片快照 / 错误状态。
+    private func apply(_ result: RepoFetchResult, to repo: RepoRecord) {
+        if let error = result.error {
             // 取消不算失败：切后台、切主题触发的重刷都会取消在途请求。
-            guard mapped != .cancelled else {
+            guard error != .cancelled else {
                 nextPollAt[repo.fullName] = Date().addingTimeInterval(2)
                 return
             }
-            lastFailure[repo.fullName] = (mapped, .now)
+            lastFailure[repo.fullName] = (error, .now)
 
-            switch mapped {
+            switch error {
             case .rateLimited(let resetAt):
                 pausedUntil = resetAt
                 nextPollAt[repo.fullName] = resetAt ?? Date().addingTimeInterval(300)
@@ -234,7 +317,28 @@ final class BuildMonitor {
             default:
                 nextPollAt[repo.fullName] = Date().addingTimeInterval(retryInterval)
             }
+            return
         }
+
+        let runs = result.runs
+        // 必须在 apply(runs:) 之前取：它里面会把仓库标记成「已见过」，
+        // 之后再判断永远是 true，于是装完 App 会把历史包全推一遍。
+        let wasPrimed = primedRepos.contains(repo.fullName)
+
+        apply(runs: runs, to: repo)
+        lastSuccess[repo.fullName] = .now
+        lastFailure[repo.fullName] = nil
+
+        let hasActive = runs.contains(where: \.isActive)
+        repo.hasWorkflows = !runs.isEmpty
+
+        if runs.isEmpty {
+            nextPollAt[repo.fullName] = Date().addingTimeInterval(3600)
+        } else {
+            nextPollAt[repo.fullName] = Date().addingTimeInterval(hasActive ? activeInterval : idleInterval)
+        }
+
+        applyArtifacts(result.artifacts, to: repo, announce: wasPrimed)
     }
 
     private func apply(runs: [WorkflowRun], to repo: RepoRecord) {
@@ -331,20 +435,14 @@ final class BuildMonitor {
         }
     }
 
-    private func loadArtifacts(
-        for runs: [WorkflowRun],
-        repo: RepoRecord,
-        client: GitHubClient,
+    /// 把预先拉好的产物写进本地库。
+    /// 网络请求已经在 `fetchRuns` 里并发做完，这里不碰网络。
+    private func applyArtifacts(
+        _ artifactsByRun: [Int: [Artifact]],
+        to repo: RepoRecord,
         announce: Bool
-    ) async {
-        for run in runs {
-            let runID = run.id
-            guard let artifacts = try? await client.artifacts(
-                owner: repo.owner,
-                repo: repo.name,
-                runID: runID
-            ) else { continue }
-
+    ) {
+        for (runID, artifacts) in artifactsByRun {
             let existingIDs = Set(
                 ((try? context.fetch(
                     FetchDescriptor<ArtifactRecord>(predicate: #Predicate { $0.runID == runID })
@@ -355,10 +453,12 @@ final class BuildMonitor {
             ))?.first
 
             var artifactsChanged = false
+            var insertedIDs: [Int] = []
             for artifact in artifacts where !existingIDs.contains(artifact.id) {
                 let record = ArtifactRecord(from: artifact, runID: runID)
                 record.run = runRecord
                 context.insert(record)
+                insertedIDs.append(artifact.id)
                 artifactsChanged = true
             }
 
@@ -377,7 +477,7 @@ final class BuildMonitor {
                                 repo: repo.displayName,
                                 name: best.name,
                                 size: best.sizeInBytes,
-                                number: run.runNumber
+                                number: runRecord?.number ?? 0
                             )
                             Task {
                                 await NotificationService.shared.notifyPackageReady(
@@ -403,7 +503,12 @@ final class BuildMonitor {
                     artifactsChanged = true
                 }
             }
-            if artifactsChanged { try? context.save() }
+
+            if artifactsChanged {
+                try? context.save()
+                // 新出现的产物可能在磁盘上有半截下载，补一条内存快照。
+                packages?.rememberDiskProgress(artifactIDs: insertedIDs.isEmpty ? artifacts.map(\.id) : insertedIDs)
+            }
         }
     }
 

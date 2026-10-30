@@ -114,11 +114,25 @@ final class RepoService {
         try? context.save()
     }
 
-    func move(from offsets: IndexSet, to destination: Int, in repos: [RepoRecord]) {
-        var ordered = repos
+    /// 重排可见仓库。
+    ///
+    /// 隐藏仓库也要参与编号：之前只给可见仓库写 0..n，
+    /// 隐藏仓库保留旧序号，恢复显示后会和可见仓库撞号、顺序错乱。
+    /// 现在的规则是「可见的按新顺序占前排，隐藏的追加在后、保持相对顺序」。
+    func move(from offsets: IndexSet, to destination: Int, in visible: [RepoRecord]) {
+        var ordered = visible
         ordered.move(fromOffsets: offsets, toOffset: destination)
+
+        let all = (try? context.fetch(
+            FetchDescriptor<RepoRecord>(sortBy: [SortDescriptor(\.sortIndex)])
+        )) ?? []
+        let hidden = all.filter(\.isHidden)
+
         for (index, repo) in ordered.enumerated() {
             repo.sortIndex = index
+        }
+        for (offset, repo) in hidden.enumerated() {
+            repo.sortIndex = ordered.count + offset
         }
         try? context.save()
     }

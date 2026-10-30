@@ -24,6 +24,13 @@ final class PackageService {
     private var lastProgress: [Int: Double] = [:]
     /// 实时速率（字节/秒），只用于展示。
     private var speeds: [Int: Double] = [:]
+    /// 磁盘进度的内存快照。
+    ///
+    /// `state(for:)` 在每张卡片的 body 里要调用好几次，
+    /// 如果每次都去读 JSON 元数据 + stat 文件，21 个仓库一屏就是上百次磁盘读。
+    /// 这里启动时预热一次，之后只读内存。
+    private var diskProgress: [Int: Double] = [:]
+    private var didPrimeDiskProgress = false
 
     private let session: GitHubSession
     private let cache: CacheStore
@@ -49,8 +56,29 @@ final class PackageService {
     func state(for artifactID: Int) -> State {
         if let state = states[artifactID] { return state }
         if let url = cache.url(for: artifactID) { return .ready(url) }
-        if let progress = downloader.progressOnDisk(for: artifactID) { return .paused(progress) }
+        if let progress = diskProgress[artifactID] { return .paused(progress) }
         return .idle
+    }
+
+    /// 启动时把磁盘上所有半截下载的进度读进内存一次。
+    /// 由 AppEnvironment 在构造后调用，避免在视图 body 里做 IO。
+    func primeDiskProgress(artifactIDs: [Int]) {
+        guard !didPrimeDiskProgress else { return }
+        didPrimeDiskProgress = true
+        for id in artifactIDs {
+            if let progress = downloader.progressOnDisk(for: id) {
+                diskProgress[id] = progress
+            }
+        }
+    }
+
+    /// 有新的产物记录进来时补一条（老仓库首次加载）。
+    func rememberDiskProgress(artifactIDs: [Int]) {
+        for id in artifactIDs where diskProgress[id] == nil {
+            if let progress = downloader.progressOnDisk(for: id) {
+                diskProgress[id] = progress
+            }
+        }
     }
 
     func start(_ target: PackageTarget) {
@@ -86,6 +114,7 @@ final class PackageService {
 
                 self.states[target.id] = .unzipping
                 let stored = try self.finalize(zipURL: zipURL, target: target)
+                self.diskProgress[target.id] = nil
                 self.states[target.id] = .ready(stored)
             } catch {
                 // 这一代已经被 pause / 新的 start 取代 → 什么状态都不要再写，
@@ -112,6 +141,7 @@ final class PackageService {
                 guard let self, case .downloading = self.states[target.id] else { return }
                 self.speeds[target.id] = bytesPerSecond
                 let previous = self.lastProgress[target.id] ?? 0
+                self.diskProgress[target.id] = value
                 guard value >= 1 || value - previous >= 0.01 else { return }
                 self.lastProgress[target.id] = value
                 self.states[target.id] = .downloading(value)
@@ -141,11 +171,13 @@ final class PackageService {
         tasks[artifactID] = nil
         downloader.pause(artifactID: artifactID)
         let progress = downloader.progressOnDisk(for: artifactID) ?? lastProgress[artifactID] ?? 0
+        diskProgress[artifactID] = progress > 0 ? progress : nil
         states[artifactID] = .paused(progress)
         speeds[artifactID] = nil
     }
 
     func reset(_ artifactID: Int) {
+        diskProgress[artifactID] = nil
         tasks[artifactID]?.cancel()
         tasks[artifactID] = nil
         lastProgress[artifactID] = nil

@@ -27,9 +27,15 @@ final class AppEnvironment {
         self.session = session
         let cache = CacheStore()
         self.cache = cache
-        self.monitor = BuildMonitor(context: context, session: session)
-        self.packages = PackageService(session: session, cache: cache)
+        let packages = PackageService(session: session, cache: cache)
+        self.packages = packages
+        self.monitor = BuildMonitor(context: context, session: session, packages: packages)
         self.repos = RepoService(context: context, session: session)
         self.appearance = AppearanceStore()
+
+        // 启动时把磁盘上的半截下载进度读进内存一次，
+        // 之后卡片 body 里只查内存，不再碰磁盘。
+        let artifactIDs = (try? context.fetch(FetchDescriptor<ArtifactRecord>()))?.map(\.id) ?? []
+        self.packages.primeDiskProgress(artifactIDs: artifactIDs)
     }
 }

@@ -64,8 +64,9 @@ struct HistoryView: View {
                     )
                 }
             }
-            .task {
-                // 首次进入默认展开最近活跃的那个，或全部（仓库少时）
+            // 用 groups.count 作为 id：首次进入时数据可能还没就绪，
+            // 只跑一次的 .task 会错过，导致永远不展开。
+            .task(id: groups.count) {
                 guard !hasInitialized, !groups.isEmpty else { return }
                 hasInitialized = true
                 if groups.count <= 3 {

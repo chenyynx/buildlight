@@ -19,11 +19,11 @@ struct HomeHeroPanel: View {
                 HStack(alignment: .top, spacing: 12) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(headline)
-                            .font(.system(size: 21, weight: .bold))
+                            .font(Type.headline)
                             .tracking(-0.4)
                             .foregroundStyle(.primary)
                         Text(subheadline)
-                            .font(.system(size: 12.5))
+                            .font(Type.label)
                             .foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 0)

@@ -5,26 +5,23 @@ import SwiftUI
 /// 强调色由用户在设置页切换，共七款；具体值在 `AccentTheme`。
 /// 视图通过环境变量 `@Environment(\.accent)` 取当前值，
 /// 不要直接引用 `Accent.primary` 这样的全局常量。
-/// 状态色：全 App 只有两个信号色。
-/// 正在跑 = 琥珀（和任何强调色都拉开色相）；失败 = 砖红；完成 = 中性。
-/// 状态色**不跟随强调色**，否则用户把强调色切成红色时，
-/// 「在跑」和「失败」会长得一模一样。
+/// 状态色：直接用系统标准色，不手调色值。
+///
+/// 为什么要用系统色：
+/// - 随系统外观、增强对比度、色彩滤镜自动适配
+/// - 和系统控件（通知、设置里的红点）是同一个红，不会"两套红"
+/// - 之前手调的琥珀 #B4691F / 砖红 #A63A2E 在深色模式下偏脏，也正是这个原因
+///
+/// 语义映射：
+/// - 进行中 = `.orange`（系统橙，表示"正在发生"）
+/// - 失败   = `.red`（系统红）
+/// - 成功   = `.green`（只在需要明确肯定时用，列表里仍保持安静）
+/// - 静默   = `.secondary`
 enum StatusTone {
-    static let running = dynamic(light: 0xB4691F, dark: 0xE0A063)
-    static let failed = dynamic(light: 0xA63A2E, dark: 0xF0736A)
-    static let idle = dynamic(light: 0xB0AAA4, dark: 0x6E6A66)
-
-    private static func dynamic(light: UInt32, dark: UInt32) -> Color {
-        Color(uiColor: UIColor { traits in
-            let hex = traits.userInterfaceStyle == .dark ? dark : light
-            return UIColor(
-                red: CGFloat((hex >> 16) & 0xFF) / 255,
-                green: CGFloat((hex >> 8) & 0xFF) / 255,
-                blue: CGFloat(hex & 0xFF) / 255,
-                alpha: 1
-            )
-        })
-    }
+    static let running = Color.orange
+    static let failed = Color.red
+    static let success = Color.green
+    static let idle = Color.secondary
 }
 
 enum Metrics {

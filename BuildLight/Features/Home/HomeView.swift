@@ -28,6 +28,8 @@ struct HomeView: View {
                     )
                     .padding(.top, 4)
 
+                    MonitorErrorBanner(errors: environment.monitor.errors)
+
                     filterBar
 
                     if sections.isEmpty {

@@ -6,7 +6,7 @@ import SwiftUI
 /// - 左右边距 20，分组标题 11pt 宽字距
 /// - 数字一律等宽（monospacedDigit），避免跳动
 /// - 分隔用 0.5pt 发丝线，不用卡片、不用阴影
-/// - 只有两个信号色：琥珀=在跑，砖红=失败
+/// - 状态用系统标准色：橙=在跑，红=失败，绿=就绪
 enum DS {
     static let pad: CGFloat = 22
     static let rowVertical: CGFloat = 13
@@ -28,15 +28,16 @@ struct SectionLabel: View {
     var body: some View {
         HStack {
             Text(title)
-                .font(.system(size: 11, weight: .semibold))
+                .font(Type.section)
+                .textCase(.uppercase)
                 .tracking(1.2)
                 .foregroundStyle(.secondary)
             Spacer(minLength: 8)
             if let trailing {
                 Text(trailing)
-                    .font(.system(size: 11))
+                    .font(Type.caption)
                     .monospacedDigit()
-                    .foregroundStyle(.quaternary)
+                    .foregroundStyle(.tertiary)
             }
         }
         .padding(.horizontal, DS.pad)

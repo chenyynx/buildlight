@@ -14,8 +14,6 @@ struct RepoCard: View {
     @Environment(\.accent) private var accent
     let repo: RepoRecord
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var appeared = false
 
     private var target: PackageTarget? {
         guard let id = repo.packageID,
@@ -39,15 +37,6 @@ struct RepoCard: View {
             }
             .padding(16)
         }
-        .opacity(appeared ? 1 : 0)
-        .offset(y: appeared ? 0 : 10)
-        .onAppear {
-            guard !reduceMotion else {
-                appeared = true
-                return
-            }
-            withAnimation(Motion.settle) { appeared = true }
-        }
     }
 
     // MARK: 主行
@@ -58,11 +47,11 @@ struct RepoCard: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(repo.displayName)
-                    .font(.system(size: 15.5, weight: .semibold))
+                    .font(Type.cardTitle)
                     .tracking(-0.1)
                     .lineLimit(1)
                 Text(subtitle)
-                    .font(.system(size: 12))
+                    .font(Type.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
@@ -78,7 +67,7 @@ struct RepoCard: View {
                     size: 20
                 )
                 Text(whenText)
-                    .font(.system(size: 11))
+                    .font(Type.caption)
                     .foregroundStyle(downloading ? AnyShapeStyle(accent.primary) : AnyShapeStyle(.tertiary))
                     .monospacedDigit()
                     .lineLimit(1)
@@ -89,19 +78,20 @@ struct RepoCard: View {
     // MARK: 产物带
 
     private func packageStrip(_ target: PackageTarget) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 7) {
             Image(systemName: packageIcon)
-                .font(.system(size: 11, weight: .semibold))
+                .font(.footnote.weight(.semibold))
                 .foregroundStyle(packageIconColor)
 
             Text(packageLabel)
-                .font(.system(size: 11.5))
-                .foregroundStyle(.secondary)
+                .font(Type.caption)
+                .foregroundStyle(packageTextColor)
                 .lineLimit(1)
 
             Spacer(minLength: 6)
 
             PackageButton(target: target, compact: true)
+                .padding(.trailing, -10)
         }
         .overlay(alignment: .top) {
             GlassHairline()
@@ -124,8 +114,19 @@ struct RepoCard: View {
 
     private var packageIconColor: Color {
         switch packageState {
+        case .ready: StatusTone.success
         case .failed: StatusTone.failed
+        case .downloading, .paused, .unzipping: StatusTone.running
         default: accent.primary
+        }
+    }
+
+    private var packageTextColor: Color {
+        switch packageState {
+        case .ready: .primary
+        case .failed: StatusTone.failed
+        case .downloading, .paused, .unzipping: .primary
+        default: .secondary
         }
     }
 

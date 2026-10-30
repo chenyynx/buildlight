@@ -1,23 +1,35 @@
 import SwiftUI
 
 /// 取包入口：下载（带进度）→ 解压 → 交给系统分享面板。
-/// compact 用在卡片上，只留一个 12pt 的纤细图标，不跟大数字抢位置。
+///
+/// **点击区**：图标看起来只有 22pt，但外层统一撑到 44×44 的最小可点区。
+/// 视觉大小和信息密度是两回事，手指不会因为图标细就点得准。
 struct PackageButton: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.accent) private var accent
     let target: PackageTarget
     var compact: Bool = false
 
+    private var glyphSize: CGFloat { compact ? 12 : 14 }
+
     var body: some View {
+        content
+            .frame(width: 44, height: 44)
+            .contentShape(.rect)
+            .sensoryFeedback(.success, trigger: isReady)
+    }
+
+    @ViewBuilder
+    private var content: some View {
         switch environment.packages.state(for: target.id) {
         case .idle:
             Button {
                 environment.packages.start(target)
             } label: {
                 Image(systemName: "arrow.down")
-                    .font(.system(size: compact ? 12 : 14, weight: .semibold))
+                    .font(.system(size: glyphSize, weight: .semibold))
                     .foregroundStyle(compact ? AnyShapeStyle(.secondary) : AnyShapeStyle(accent.primary))
-                    .frame(width: compact ? 22 : 34, height: compact ? 22 : 34)
+                    .frame(width: compact ? 26 : 34, height: compact ? 26 : 34)
                     .background {
                         if !compact {
                             Circle().fill(accent.soft)
@@ -38,19 +50,19 @@ struct PackageButton: View {
 
         case .downloading(let progress):
             DownloadRing(progress: progress, size: compact ? 22 : 32, lineWidth: compact ? 2 : 3)
+                .accessibilityLabel("正在下载 \(Int(progress * 100))%")
 
         case .unzipping:
             ProgressView()
                 .controlSize(.mini)
-                .frame(width: compact ? 22 : 30, height: compact ? 22 : 30)
                 .accessibilityLabel("正在解压")
 
         case .ready(let url):
             ShareLink(item: url) {
                 Image(systemName: "square.and.arrow.up")
-                    .font(.system(size: compact ? 12 : 14, weight: .semibold))
+                    .font(.system(size: glyphSize, weight: .semibold))
                     .foregroundStyle(accent.primary)
-                    .frame(width: compact ? 22 : 34, height: compact ? 22 : 34)
+                    .frame(width: compact ? 26 : 34, height: compact ? 26 : 34)
                     .background {
                         if !compact {
                             Circle().fill(accent.soft)
@@ -64,9 +76,9 @@ struct PackageButton: View {
                 environment.packages.start(target)
             } label: {
                 Image(systemName: "arrow.clockwise")
-                    .font(.system(size: compact ? 12 : 14, weight: .semibold))
+                    .font(.system(size: glyphSize, weight: .semibold))
                     .foregroundStyle(StatusTone.failed)
-                    .frame(width: compact ? 22 : 34, height: compact ? 22 : 34)
+                    .frame(width: compact ? 26 : 34, height: compact ? 26 : 34)
                     .background {
                         if !compact {
                             Circle().fill(StatusTone.failed.opacity(0.12))
@@ -76,5 +88,10 @@ struct PackageButton: View {
             .buttonStyle(.plain)
             .accessibilityLabel("重试下载")
         }
+    }
+
+    private var isReady: Bool {
+        if case .ready = environment.packages.state(for: target.id) { return true }
+        return false
     }
 }

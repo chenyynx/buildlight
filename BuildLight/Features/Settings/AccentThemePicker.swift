@@ -22,7 +22,7 @@ struct AccentThemePicker: View {
                 }
             }
 
-            Text("强调色只影响按钮、选中态和进度；构建状态永远是固定的琥珀与砖红。")
+            Text("强调色只影响按钮、选中态和进度；构建状态用系统标准色（橙 / 红），不跟强调色变。")
                 .font(.system(size: 11.5))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

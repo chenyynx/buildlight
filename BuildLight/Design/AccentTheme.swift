@@ -60,6 +60,6 @@ enum AccentTheme: String, CaseIterable, Identifiable, Sendable {
 
     /// 背景上的大色晕。玻璃要折射出东西，背后得有东西。
     func wash(for scheme: ColorScheme) -> Color {
-        primary(for: scheme).opacity(scheme == .dark ? 0.22 : 0.14)
+        primary(for: scheme).opacity(scheme == .dark ? 0.16 : 0.08)
     }
 }

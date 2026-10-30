@@ -41,7 +41,7 @@ enum Metrics {
     static let radiusXL: CGFloat = 28
 
     /// 悬浮 tab 栏下方留白，避免最后一行被盖住。
-    static let tabBarClearance: CGFloat = 96
+    static let tabBarClearance: CGFloat = 124
 }
 
 extension Font {

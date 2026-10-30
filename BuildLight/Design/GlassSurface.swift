@@ -7,10 +7,11 @@ import SwiftUI
 /// 在 iOS 26 上会和系统控件（tab 栏、工具栏）明显不同层。
 /// `.glassEffect` 是同一套渲染管线，浮在内容上时能折射背后的卡片。
 ///
-/// 三档：
-/// - `.panel`  内容区大面板，卡片背后的底板
-/// - `.card`   仓库卡片
-/// - `.chip`   小胶囊（状态标签、筛选条）
+/// **着色强度是这里最容易做错的地方**：
+/// `Glass.tint` 不是「底色」，它是叠在玻璃上的染色。
+/// 一旦超过 0.2 左右，卡片就会变成一块纯色板，所有正文对比度立刻垮掉。
+/// 这里只给 0.06–0.12 的极轻染色——玻璃的质感来自它对背景的折射，
+/// 不是来自颜色。
 enum GlassLevel {
     case panel
     case card
@@ -18,9 +19,9 @@ enum GlassLevel {
 
     var tintOpacity: Double {
         switch self {
-        case .panel: 0.55
-        case .card: 0.7
-        case .chip: 0.9
+        case .panel: 0.07
+        case .card: 0.09
+        case .chip: 0.14
         }
     }
 }
@@ -37,22 +38,28 @@ struct GlassSurface<Content: View>: View {
     @Environment(\.accent) private var accent
 
     var body: some View {
-        let style = Glass.regular.tint(accent.primary.opacity(level.tintOpacity))
         let shape: RoundedRectangle = .rect(cornerRadius: cornerRadius)
+        let tinted = accent.primary.opacity(level.tintOpacity)
 
         Group {
             if reduceTransparency {
-                // 用户要求降低透明度时退回实色，玻璃的可读性优先于质感。
+                // 用户要求降低透明度时退回实色，可读性优先于质感。
                 content
                     .background(
-                        scheme == .dark
-                            ? Color(white: 0.13)
-                            : Color(white: 0.99),
+                        scheme == .dark ? Color(white: 0.13) : Color(white: 0.99),
                         in: shape
                     )
+                    .overlay {
+                        shape.strokeBorder(tinted, lineWidth: 1)
+                    }
             } else {
                 content
-                    .glassEffect(interactive ? style.interactive() : style, in: shape)
+                    .glassEffect(
+                        interactive
+                            ? Glass.regular.tint(tinted).interactive()
+                            : Glass.regular.tint(tinted),
+                        in: shape
+                    )
             }
         }
     }
@@ -62,9 +69,11 @@ struct GlassSurface<Content: View>: View {
 struct GlassHairline: View {
     var leading: CGFloat = 0
 
+    @Environment(\.colorScheme) private var scheme
+
     var body: some View {
         Rectangle()
-            .fill(.white.opacity(0.14))
+            .fill(scheme == .dark ? .white.opacity(0.12) : .black.opacity(0.08))
             .frame(height: 0.5)
             .padding(.leading, leading)
     }

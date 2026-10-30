@@ -8,7 +8,7 @@ import SwiftUI
 /// - 分隔用 0.5pt 发丝线，不用卡片、不用阴影
 /// - 只有两个信号色：琥珀=在跑，砖红=失败
 enum DS {
-    static let pad: CGFloat = 20
+    static let pad: CGFloat = 22
     static let rowVertical: CGFloat = 13
 }
 
@@ -30,7 +30,7 @@ struct SectionLabel: View {
             Text(title)
                 .font(.system(size: 11, weight: .semibold))
                 .tracking(1.2)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(.secondary)
             Spacer(minLength: 8)
             if let trailing {
                 Text(trailing)

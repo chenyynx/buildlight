@@ -44,6 +44,7 @@ struct RootView: View {
                 RootTabView()
             }
         }
+        .tint(accent.primary)
         .environment(\.accent, accent)
         .environment(\.reducesMotion, environment.appearance.reduceMotionEnabled)
         .task {

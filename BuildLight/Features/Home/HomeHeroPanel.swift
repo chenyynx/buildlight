@@ -26,8 +26,7 @@ struct HomeHeroPanel: View {
                             .font(.system(size: 12.5))
                             .foregroundStyle(.secondary)
                     }
-                    Spacer(minLength: 8)
-                    PulseBadge(count: runningCount)
+                    Spacer(minLength: 0)
                 }
 
                 HStack(spacing: 0) {
@@ -60,35 +59,3 @@ struct HomeHeroPanel: View {
     }
 }
 
-/// 在跑数量的小徽标。没有在跑的时候整体变灰，不抢注意力。
-struct PulseBadge: View {
-    let count: Int
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var pulsing = false
-
-    var body: some View {
-        HStack(spacing: 5) {
-            if count > 0 {
-                Circle()
-                    .fill(StatusTone.running)
-                    .frame(width: 6, height: 6)
-                    .scaleEffect(pulsing && !reduceMotion ? 1.35 : 1)
-                    .opacity(pulsing && !reduceMotion ? 0.55 : 1)
-            }
-            Text("\(count)")
-                .font(.system(size: 13, weight: .semibold).monospacedDigit())
-                .foregroundStyle(count > 0 ? .primary : .tertiary)
-        }
-        .padding(.horizontal, 10)
-        .frame(height: 28)
-        .background(.quaternary.opacity(0.4), in: .capsule)
-        .onAppear {
-            guard count > 0, !reduceMotion else { return }
-            withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {
-                pulsing = true
-            }
-        }
-        .accessibilityLabel("\(count) 个构建进行中")
-    }
-}

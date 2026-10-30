@@ -37,7 +37,7 @@ struct RepoCard: View {
                         .padding(.top, 10)
                 }
             }
-            .padding(14)
+            .padding(16)
         }
         .opacity(appeared ? 1 : 0)
         .offset(y: appeared ? 0 : 10)

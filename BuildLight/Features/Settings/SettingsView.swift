@@ -17,10 +17,13 @@ struct SettingsView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    ScreenHeader(
-                        title: "设置",
-                        subtitle: loginSubtitle
-                    )
+                    if let login = environment.session.user?.login {
+                        Text("已连接 \(login)")
+                            .font(.system(size: 12.5))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, DS.pad)
+                            .padding(.bottom, 4)
+                    }
 
                     SectionLabel("外观")
                     GlassSurface(level: .panel, cornerRadius: Metrics.radiusL) {
@@ -150,7 +153,8 @@ struct SettingsView: View {
             }
             .scrollIndicators(.hidden)
             .background(PaperBackground())
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("设置")
+            .navigationBarTitleDisplayMode(.large)
             .navigationDestination(for: SettingsRoute.self) { route in
                 switch route {
                 case .cache: CacheView()
@@ -223,13 +227,6 @@ struct SettingsView: View {
             .foregroundStyle(.white)
             .frame(width: 26, height: 26)
             .background(tint, in: .rect(cornerRadius: 7))
-    }
-
-    private var loginSubtitle: String {
-        if let login = environment.session.user?.login {
-            return "已连接 \(login)"
-        }
-        return "已连接"
     }
 
     private var visibleCount: Int {

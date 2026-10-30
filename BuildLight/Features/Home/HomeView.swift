@@ -20,7 +20,7 @@ struct HomeView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     HomeHeroPanel(
-                        readyCount: sections.ready.count,
+                        readyCount: sections.actionable.count,
                         runningCount: sections.running.count,
                         failedCount: failingCount,
                         totalCount: visibleRepos.count,
@@ -41,6 +41,7 @@ struct HomeView: View {
 
                     cardGroups
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.bottom, Metrics.tabBarClearance)
             }
             .scrollIndicators(.hidden)

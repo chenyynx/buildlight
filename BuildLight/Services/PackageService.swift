@@ -31,6 +31,10 @@ final class PackageService {
     /// 用户主动暂停的包。区分它和「下载失败」，
     /// 否则点一下暂停会弹出一个「重试」的错误态。
     private var pausedByUser: Set<Int> = []
+    /// 每次 start 生成一个 token。旧 Task 结束时不看 token 就清 tasks[id]，
+    /// 会把用户刚点「继续」新建的那个 task 引用一起抹掉——
+    /// 于是第三次点击又能起一个下载，两个流写同一个 .part。
+    private var generations: [Int: UUID] = [:]
 
     init(session: GitHubSession, cache: CacheStore) {
         self.session = session
@@ -59,32 +63,44 @@ final class PackageService {
         // 有半截文件就从它的进度接着显示，不要跳回 0% 骗人
         lastProgress[target.id] = downloader.progressOnDisk(for: target.id) ?? 0
         states[target.id] = .downloading(lastProgress[target.id] ?? 0)
+
+        let generation = UUID()
+        generations[target.id] = generation
+
         tasks[target.id] = Task { [weak self] in
             guard let self else { return }
-            defer { self.tasks[target.id] = nil }
+            defer {
+                // 只有「这一代」还活着才清理，避免旧任务踩掉新任务。
+                if self.generations[target.id] == generation {
+                    self.tasks[target.id] = nil
+                    self.generations[target.id] = nil
+                }
+            }
             do {
                 var request = URLRequest(url: target.archiveURL)
                 request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
                 request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
 
                 let zipURL = try await self.download(request, target: target)
+                guard self.generations[target.id] == generation else { return }
 
                 self.states[target.id] = .unzipping
                 let stored = try self.finalize(zipURL: zipURL, target: target)
                 self.states[target.id] = .ready(stored)
-            } catch is CancellationError {
-                // 暂停：保留已下载的字节，状态回到 paused
-                let progress = self.downloader.progressOnDisk(for: target.id) ?? 0
-                self.states[target.id] = .paused(progress)
             } catch {
-                if self.pausedByUser.contains(target.id) {
+                // 这一代已经被 pause / 新的 start 取代 → 什么状态都不要再写，
+                // 否则旧任务会把新任务的「下载中」覆盖成「已暂停」或「失败」。
+                guard self.generations[target.id] == generation else { return }
+
+                if error is CancellationError || self.pausedByUser.contains(target.id) {
+                    // 暂停：保留已下载的字节，状态回到 paused
                     let progress = self.downloader.progressOnDisk(for: target.id) ?? 0
-                    self.states[target.id] = .paused(progress)
+                    self.states[target.id] = progress > 0 ? .paused(progress) : .idle
                 } else {
                     self.states[target.id] = .failed(AppError.map(error))
                 }
+                self.pausedByUser.remove(target.id)
             }
-            self.pausedByUser.remove(target.id)
         }
     }
 
@@ -119,6 +135,8 @@ final class PackageService {
     /// 暂停下载。已落盘的字节会保留，下次点继续从断点续传。
     func pause(_ artifactID: Int) {
         pausedByUser.insert(artifactID)
+        // 先作废这一代，再取消任务：旧 Task 的 defer 就不会再动 tasks 表。
+        generations[artifactID] = nil
         tasks[artifactID]?.cancel()
         tasks[artifactID] = nil
         downloader.pause(artifactID: artifactID)

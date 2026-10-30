@@ -15,6 +15,10 @@ struct BuildLightApp: App {
             container = try! PersistenceStack.makeContainer(inMemory: true)
         }
         _environment = State(initialValue: AppEnvironment(container: container))
+
+        // 必须在这里挂：从通知冷启动时，系统会在 Scene 建立前投递 response。
+        // 放到 .task 里就晚了，点击会被丢掉。
+        UNUserNotificationCenter.current().delegate = NotificationDelegate.shared
     }
 
     var body: some Scene {
@@ -49,7 +53,6 @@ struct RootView: View {
         .environment(\.accent, accent)
         .environment(\.reducesMotion, environment.appearance.reduceMotionEnabled)
         .task {
-            UNUserNotificationCenter.current().delegate = NotificationDelegate.shared
             await environment.session.refreshIdentityIfNeeded()
             await NotificationService.shared.prepareIfNeeded()
             // 冷启动时 scenePhase 初始就是 .active，onChange 不会触发。

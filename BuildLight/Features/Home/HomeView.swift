@@ -21,8 +21,11 @@ struct HomeView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     HomeHeroPanel(
-                        readyCount: sections.actionable.count,
-                        runningCount: sections.running.count,
+                        // 摘要永远是全量口径：筛选只影响下面的列表。
+                        // 之前切到「失败」时顶部会变成「0 可安装 / 0 在跑」，
+                        // 看起来像数据没了。
+                        readyCount: allSections.actionable.count,
+                        runningCount: allSections.running.count,
                         failedCount: failingCount,
                         totalCount: visibleRepos.count,
                         lastRefresh: environment.monitor.lastRefreshAt
@@ -168,12 +171,19 @@ struct HomeView: View {
         }
     }
 
+    /// 全量分组，只给顶部摘要用。
+    private var allSections: HomeSections {
+        HomeSections.make(from: visibleRepos, isReady: isPackageReady)
+    }
+
     private var sections: HomeSections {
-        HomeSections.make(from: filteredRepos) { repo in
-            guard let id = repo.packageID else { return false }
-            if case .ready = environment.packages.state(for: id) { return true }
-            return false
-        }
+        HomeSections.make(from: filteredRepos, isReady: isPackageReady)
+    }
+
+    private func isPackageReady(_ repo: RepoRecord) -> Bool {
+        guard let id = repo.packageID else { return false }
+        if case .ready = environment.packages.state(for: id) { return true }
+        return false
     }
 
     private var failingCount: Int {

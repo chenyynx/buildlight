@@ -226,6 +226,14 @@ actor GitHubClient {
         return page.workflowRuns
     }
 
+    /// 单条 run。深链冷启动时本地没有记录，用它补拉。
+    func run(owner: String, repo: String, runID: Int) async throws -> WorkflowRun {
+        try await decode(
+            WorkflowRun.self,
+            from: try await get("/repos/\(owner)/\(repo)/actions/runs/\(runID)")
+        )
+    }
+
     /// 仓库里的工作流名字列表。用于「只看某个工作流」的筛选。
     func workflows(owner: String, repo: String) async throws -> [String] {
         struct Envelope: Decodable {

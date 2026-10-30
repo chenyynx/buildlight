@@ -10,6 +10,9 @@ struct SettingsView: View {
 
     @AppStorage(NotificationService.storageKey) private var notifyBuildEvents = true
     @State private var notificationDenied = false
+    /// 系统授权状态。开关的真实值 = 用户意愿 && 系统已授权，
+    /// 否则会出现「开关显示开、但根本收不到」的谎报状态。
+    @State private var notificationAuthorized = false
     @State private var showingSignOutConfirmation = false
     @State private var isSyncing = false
 
@@ -98,18 +101,18 @@ struct SettingsView: View {
                     GroupBox2 {
                         HStack(spacing: 12) {
                             glyph("bell.badge.fill", tint: StatusTone.failed)
-                            Text("构建结束提醒")
-                                .font(.system(size: 15))
-                            Spacer(minLength: 8)
-                            Toggle("", isOn: $notifyBuildEvents)
-                                .labelsHidden()
-                                .onChange(of: notifyBuildEvents) { _, enabled in
-                                    guard enabled else { return }
-                                    Task {
-                                        let granted = await NotificationService.shared.requestAuthorization()
-                                        notificationDenied = !granted
-                                    }
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("构建结束提醒")
+                                    .font(.system(size: 15))
+                                if !notificationAuthorized {
+                                    Text("系统未授权，收不到任何提醒")
+                                        .font(Type.caption)
+                                        .foregroundStyle(.secondary)
                                 }
+                            }
+                            Spacer(minLength: 8)
+                            Toggle("", isOn: notifyBinding)
+                                .labelsHidden()
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 9)
@@ -124,7 +127,7 @@ struct SettingsView: View {
                                 FunctionRow(
                                     systemImage: "exclamationmark.triangle.fill",
                                     tint: StatusTone.failed,
-                                    title: "系统未授权通知",
+                                    title: "去系统设置开启通知",
                                     showsChevron: true
                                 )
                             }
@@ -253,9 +256,32 @@ struct SettingsView: View {
         return "\(version) (\(build))"
     }
 
+    /// 开关绑定。
+    ///
+    /// 打开时如果系统还没授权，先走一次授权请求；被拒就把开关退回关，
+    /// 不留一个「看着是开的但其实收不到」的状态。
+    private var notifyBinding: Binding<Bool> {
+        Binding(
+            get: { notifyBuildEvents && notificationAuthorized },
+            set: { wantsOn in
+                guard wantsOn else {
+                    notifyBuildEvents = false
+                    return
+                }
+                Task {
+                    let granted = await NotificationService.shared.requestAuthorization()
+                    notificationAuthorized = granted
+                    notificationDenied = !granted
+                    notifyBuildEvents = granted
+                }
+            }
+        )
+    }
+
     private func refreshNotificationState() async {
         await NotificationService.shared.refreshStatus()
         notificationDenied = NotificationService.shared.isDenied
+        notificationAuthorized = NotificationService.shared.isAuthorized
     }
 
     private func sync() async {

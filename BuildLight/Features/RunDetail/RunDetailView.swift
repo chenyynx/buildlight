@@ -13,11 +13,17 @@ struct RunDetailView: View {
     @State private var jobs: [WorkflowJob] = []
     @State private var loadError: AppError?
     @State private var isLoading = false
+    /// 自动定位只做一次。轮询每次都会替换 jobs，
+    /// 不加这个标记的话，用户往上翻会被每 3 秒拽回失败步骤。
+    @State private var didAutoScroll = false
+    @State private var didLoadArtifacts = false
 
     var body: some View {
         ScrollViewReader { proxy in
             content
-                .onChange(of: jobs) { _, _ in
+                .onChange(of: jobs) { _, newValue in
+                    guard !didAutoScroll, !newValue.isEmpty else { return }
+                    didAutoScroll = true
                     scrollToFailure(proxy)
                 }
         }
@@ -25,7 +31,10 @@ struct RunDetailView: View {
         .background(PaperBackground())
         .navigationTitle("#\(run.number)")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await load() }
+        .task {
+            await load()
+            await loadArtifactsIfNeeded()
+        }
         .task(id: run.isActive) { await pollWhileRunning() }
     }
 
@@ -48,7 +57,9 @@ struct RunDetailView: View {
                         .id("job-\(job.id)")
                     ForEach(job.steps) { step in
                         StepRow(step: step)
-                            .id("step-\(step.id)")
+                            // step.number 只在 job 内唯一，跨 job 会撞号，
+                            // 锚点必须带上 job.id 才不会滚错位置。
+                            .id("step-\(job.id)-\(step.number)")
                     }
                     Hairline(leading: DS.pad)
                 }
@@ -72,12 +83,16 @@ struct RunDetailView: View {
     /// 用户点进一条失败的记录，想看的就是「哪一步挂了」，
     /// 不应该让他从头往下翻。
     private func scrollToFailure(_ proxy: ScrollViewProxy) {
-        guard let failed = jobs
-            .flatMap(\.steps)
-            .first(where: { $0.conclusion == .failure || $0.conclusion == .timedOut })
-        else { return }
+        // 直接找 (job, step) 组合。只按 step.number 找的话，
+        // 两个 job 都有「第 3 步失败」时会滚到错误的位置。
+        let anchor: String? = jobs.lazy.compactMap { job -> String? in
+            guard let step = job.steps.first(where: \.isFailed) else { return nil }
+            return "step-\(job.id)-\(step.number)"
+        }.first
+
+        guard let anchor else { return }
         withAnimation(Motion.settle) {
-            proxy.scrollTo("step-\(failed.id)", anchor: .center)
+            proxy.scrollTo(anchor, anchor: .center)
         }
     }
 
@@ -218,6 +233,13 @@ struct RunDetailView: View {
     }
 
     // MARK: 行为
+
+    /// 老运行的产物没在首页预拉过，进详情页时补一次。
+    private func loadArtifactsIfNeeded() async {
+        guard !didLoadArtifacts else { return }
+        didLoadArtifacts = true
+        await environment.monitor.ensureArtifacts(for: run)
+    }
 
     private func load() async {
         guard let client = environment.session.client, !isLoading else { return }

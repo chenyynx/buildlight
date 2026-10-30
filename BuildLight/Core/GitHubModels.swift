@@ -157,6 +157,10 @@ struct WorkflowStep: Decodable, Identifiable, Hashable, Sendable {
     var status: RunStatus { RunStatus(raw: statusRaw) }
     var conclusion: RunConclusion { RunConclusion(raw: conclusionRaw) }
 
+    var isFailed: Bool {
+        conclusion == .failure || conclusion == .timedOut
+    }
+
     enum CodingKeys: String, CodingKey {
         case name, number
         case statusRaw = "status"

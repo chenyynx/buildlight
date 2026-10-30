@@ -125,6 +125,67 @@ final class BuildMonitor {
         }
     }
 
+    /// 深链用：本地没有这条 run 时，按 runID 补拉一条并落库。
+    /// 找不到对应仓库记录时直接返回 nil，不凭空造一个仓库。
+    func ensureRun(repoFullName: String, runID: Int) async -> RunRecord? {
+        if let existing = try? context.fetch(
+            FetchDescriptor<RunRecord>(predicate: #Predicate { $0.id == runID })
+        ).first {
+            return existing
+        }
+
+        guard let client = session.client else { return nil }
+        let parts = repoFullName.split(separator: "/")
+        guard parts.count == 2 else { return nil }
+        let repoRecord = (try? context.fetch(
+            FetchDescriptor<RepoRecord>(predicate: #Predicate { $0.fullName == repoFullName })
+        ))?.first
+
+        guard let run = try? await client.run(
+            owner: String(parts[0]),
+            repo: String(parts[1]),
+            runID: runID
+        ) else { return nil }
+
+        let record = RunRecord(from: run, repoFullName: repoFullName)
+        record.repo = repoRecord
+        context.insert(record)
+        try? context.save()
+        return record
+    }
+
+    /// 按需拉某个 run 的产物并落库。
+    ///
+    /// 首页只对最新两条 run 预拉产物（省配额），
+    /// 所以打开老运行详情时这里要能补上——否则「安装包」永远是空的，
+    /// 看起来像那次构建没产出，实际是没查过。
+    @discardableResult
+    func ensureArtifacts(for run: RunRecord) async -> Bool {
+        guard let client = session.client else { return false }
+        let runID = run.id
+        let existing = (try? context.fetch(
+            FetchDescriptor<ArtifactRecord>(predicate: #Predicate { $0.runID == runID })
+        )) ?? []
+        guard existing.isEmpty else { return true }
+
+        let parts = run.repoFullName.split(separator: "/")
+        guard parts.count == 2,
+              let artifacts = try? await client.artifacts(
+                  owner: String(parts[0]),
+                  repo: String(parts[1]),
+                  runID: runID
+              )
+        else { return false }
+
+        for artifact in artifacts {
+            let record = ArtifactRecord(from: artifact, runID: runID)
+            record.run = run
+            context.insert(record)
+        }
+        try? context.save()
+        return true
+    }
+
     // MARK: 单个仓库
 
     private func refresh(repo: RepoRecord, client: GitHubClient) async {
@@ -247,6 +308,7 @@ final class BuildMonitor {
                 let event = BuildEvent(
                     runID: hit.id,
                     repo: repo.displayName,
+                    repoFullName: repo.fullName,
                     branch: hit.run.headBranch,
                     number: hit.run.runNumber,
                     conclusion: hit.run.conclusionRaw ?? "",

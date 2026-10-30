@@ -12,8 +12,6 @@ import UserNotifications
 final class NotificationService {
     static let shared = NotificationService()
 
-    /// 用户点了通知里的哪个 run。根视图监听它并跳转。
-    var pendingRunID: Int?
     nonisolated static let storageKey = "notifyBuildEvents"
 
     private(set) var isAuthorized = false
@@ -58,12 +56,6 @@ final class NotificationService {
         }
     }
 
-    /// 点通知后把 runID 交给界面层消费一次。
-    func consumePendingRunID() -> Int? {
-        defer { pendingRunID = nil }
-        return pendingRunID
-    }
-
     /// 安装包就绪通知。
     ///
     /// 和「构建完成」分开：包通常比整条 run 早几分钟生成，
@@ -97,8 +89,13 @@ final class NotificationService {
         content.title = event.title
         content.body = event.body
         content.sound = .default
-        content.threadIdentifier = "build-\(event.repo)"
-        content.userInfo = ["runID": event.runID]
+        content.threadIdentifier = "build-\(event.repoFullName)"
+        // 带上仓库全名：冷启动时本地库还没有这条记录，
+        // 只有 runID 的话没有任何接口能查出它属于哪个仓库。
+        content.userInfo = [
+            "runID": event.runID,
+            "repo": event.repoFullName
+        ]
 
         let request = UNNotificationRequest(
             identifier: "run-\(event.runID)-\(event.conclusion)",
@@ -111,7 +108,10 @@ final class NotificationService {
 
 struct BuildEvent: Sendable {
     let runID: Int
+    /// 展示用短名。
     let repo: String
+    /// 完整 repo，通知点进去要靠它补拉数据。
+    let repoFullName: String
     let branch: String?
     let number: Int
     let conclusion: String

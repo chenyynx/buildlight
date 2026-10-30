@@ -5,5 +5,6 @@ import WidgetKit
 struct BuildLightWidgetBundle: WidgetBundle {
     var body: some Widget {
         BuildActivityWidget()
+        BuildStatusWidget()
     }
 }

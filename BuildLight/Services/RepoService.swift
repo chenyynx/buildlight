@@ -128,11 +128,15 @@ final class RepoService {
         )) ?? []
         let hidden = all.filter(\.isHidden)
 
-        for (index, repo) in ordered.enumerated() {
-            repo.sortIndex = index
-        }
-        for (offset, repo) in hidden.enumerated() {
-            repo.sortIndex = ordered.count + offset
+        // 编号规则抽到 RepoOrdering，纯函数可单测。
+        let assignment = RepoOrdering.assign(
+            visible: ordered.map(\.fullName),
+            hidden: hidden.map(\.fullName)
+        )
+        for repo in all {
+            if let index = assignment[repo.fullName] {
+                repo.sortIndex = index
+            }
         }
         try? context.save()
     }

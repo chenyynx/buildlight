@@ -132,10 +132,11 @@ struct HomeView: View {
         }
     }
 
-    private func card(_ section: HomeSection) -> some View {
-        NavigationLink(value: section.repo.fullName) {
-            RepoCardContainer(repo: section.repo) {
-                RepoCard(repo: section.repo)
+    private func card(_ section: HomeSection<RepoRecord>) -> some View {
+        let repo = section.item
+        return NavigationLink(value: repo.fullName) {
+            RepoCardContainer(repo: repo) {
+                RepoCard(repo: repo)
             }
         }
         .buttonStyle(PressableStyle())
@@ -179,11 +180,11 @@ struct HomeView: View {
     }
 
     /// 全量分组，只给顶部摘要用。
-    private var allSections: HomeSections {
+    private var allSections: HomeSections<RepoRecord> {
         HomeSections.make(from: visibleRepos, isReady: isPackageReady)
     }
 
-    private var sections: HomeSections {
+    private var sections: HomeSections<RepoRecord> {
         HomeSections.make(from: filteredRepos, isReady: isPackageReady)
     }
 

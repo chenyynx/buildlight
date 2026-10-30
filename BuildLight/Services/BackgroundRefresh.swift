@@ -1,5 +1,6 @@
 import BackgroundTasks
 import Foundation
+import SwiftData
 
 /// 后台刷新。
 ///
@@ -48,10 +49,10 @@ final class BackgroundRefresh {
 
         let work = Task { @MainActor in
             // 没有在跑的构建就什么都不做，省电也省配额。
-            let hasActive = (try? environment.context.fetchCount(
+            let active = (try? environment.context.fetch(
                 FetchDescriptor<RepoRecord>(predicate: #Predicate { $0.activeRunCount > 0 })
-            )) ?? 0 > 0
-            guard hasActive else { return }
+            )) ?? []
+            guard !active.isEmpty else { return }
             await environment.monitor.refreshAll()
         }
 

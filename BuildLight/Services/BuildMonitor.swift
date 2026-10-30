@@ -13,23 +13,10 @@ final class BuildMonitor {
     private weak var packages: PackageService?
 
     private var nextPollAt: [String: Date] = [:]
-    /// 每个仓库「最近一次失败」+「最近一次成功」，用来判断这个错误是不是过期了。
-    ///
-    /// 之前是整个字典只增不减：某个仓库偶发一次超时，之后全跑通了，
-    /// 那条错误还挂着，顶部就永远显示「网络不可用」。
-    private var lastFailure: [String: (error: AppError, at: Date)] = [:]
-    private var lastSuccess: [String: Date] = [:]
+    /// 错误生命周期。纯逻辑抽到 `MonitorIssueTracker`，方便单测。
+    private var issues = MonitorIssueTracker()
 
-    /// 只暴露「至今仍然成立」的错误：
-    /// 该仓库最近一次成功如果不晚于最近一次失败，这条错误就已经过期，不再显示。
-    var errors: [String: AppError] {
-        var result: [String: AppError] = [:]
-        for (key, failure) in lastFailure {
-            if let success = lastSuccess[key], success > failure.at { continue }
-            result[key] = failure.error
-        }
-        return result
-    }
+    var errors: [String: AppError] { issues.activeErrors }
     private(set) var isRefreshing = false
     private(set) var lastRefreshAt: Date?
     private var pausedUntil: Date?
@@ -94,9 +81,7 @@ final class BuildMonitor {
         )) ?? []
 
         // 仓库被删掉或隐藏后，它的错误记录不应该继续挂在界面上。
-        let alive = Set(all.filter { !$0.isHidden }.map(\.fullName))
-        lastFailure = lastFailure.filter { alive.contains($0.key) }
-        lastSuccess = lastSuccess.filter { alive.contains($0.key) }
+        issues.prune(keeping: Set(all.filter { !$0.isHidden }.map(\.fullName)))
 
         let now = Date()
         let due = all
@@ -303,7 +288,7 @@ final class BuildMonitor {
                 nextPollAt[repo.fullName] = Date().addingTimeInterval(2)
                 return
             }
-            lastFailure[repo.fullName] = (error, .now)
+            issues.recordFailure(repo: repo.fullName, error: error, at: .now)
 
             switch error {
             case .rateLimited(let resetAt):
@@ -326,8 +311,7 @@ final class BuildMonitor {
         let wasPrimed = primedRepos.contains(repo.fullName)
 
         apply(runs: runs, to: repo)
-        lastSuccess[repo.fullName] = .now
-        lastFailure[repo.fullName] = nil
+        issues.recordSuccess(repo: repo.fullName, at: .now)
 
         let hasActive = runs.contains(where: \.isActive)
         repo.hasWorkflows = !runs.isEmpty

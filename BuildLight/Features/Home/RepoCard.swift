@@ -199,6 +199,21 @@ struct RepoCard: View {
         if repo.latestFailed { return StatusTone.failed }
         return nil
     }
+
+    /// 整卡朗读文本。分开读会把「名字 / 分支 / 耗时 / 包大小」
+    /// 拆成四次滑动，扫读成本翻倍。
+    private var accessibilityText: String {
+        var parts = [repo.displayName]
+        if repo.isRunning {
+            parts.append("正在构建")
+        } else if repo.latestFailed {
+            parts.append("上次构建失败")
+        }
+        if !subtitle.isEmpty { parts.append(subtitle) }
+        parts.append(whenText)
+        if target != nil { parts.append(packageLabel) }
+        return parts.joined(separator: "，")
+    }
 }
 
 /// 卡片左侧的状态标记。

@@ -28,6 +28,9 @@ final class PackageService {
     private let session: GitHubSession
     private let cache: CacheStore
     private let downloader = ResumableDownloader.shared
+    /// 用户主动暂停的包。区分它和「下载失败」，
+    /// 否则点一下暂停会弹出一个「重试」的错误态。
+    private var pausedByUser: Set<Int> = []
 
     init(session: GitHubSession, cache: CacheStore) {
         self.session = session
@@ -69,9 +72,19 @@ final class PackageService {
                 self.states[target.id] = .unzipping
                 let stored = try self.finalize(zipURL: zipURL, id: target.id)
                 self.states[target.id] = .ready(stored)
+            } catch is CancellationError {
+                // 暂停：保留已下载的字节，状态回到 paused
+                let progress = self.downloader.progressOnDisk(for: target.id) ?? 0
+                self.states[target.id] = .paused(progress)
             } catch {
-                self.states[target.id] = .failed(AppError.map(error))
+                if self.pausedByUser.contains(target.id) {
+                    let progress = self.downloader.progressOnDisk(for: target.id) ?? 0
+                    self.states[target.id] = .paused(progress)
+                } else {
+                    self.states[target.id] = .failed(AppError.map(error))
+                }
             }
+            self.pausedByUser.remove(target.id)
         }
     }
 
@@ -101,6 +114,17 @@ final class PackageService {
             request: request,
             onProgress: progress
         )
+    }
+
+    /// 暂停下载。已落盘的字节会保留，下次点继续从断点续传。
+    func pause(_ artifactID: Int) {
+        pausedByUser.insert(artifactID)
+        tasks[artifactID]?.cancel()
+        tasks[artifactID] = nil
+        downloader.pause(artifactID: artifactID)
+        let progress = downloader.progressOnDisk(for: artifactID) ?? lastProgress[artifactID] ?? 0
+        states[artifactID] = .paused(progress)
+        speeds[artifactID] = nil
     }
 
     func reset(_ artifactID: Int) {

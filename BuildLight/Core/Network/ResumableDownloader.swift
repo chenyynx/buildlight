@@ -38,6 +38,9 @@ final class ResumableDownloader: NSObject, @unchecked Sendable {
     private let directory: URL
     private var session: URLSession!
     private var states: [Int: TaskState] = [:]
+    /// 按 artifactID 记住正在跑的任务，用于「暂停」。
+    /// states 是按 taskIdentifier 存的，外部拿不到 ID，所以这里再索引一层。
+    private var runningTasks: [Int: URLSessionDataTask] = [:]
 
     private override init() {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
@@ -60,6 +63,15 @@ final class ResumableDownloader: NSObject, @unchecked Sendable {
               let size = fileSize(partURL(artifactID)), size > 0, size < meta.expected
         else { return nil }
         return min(max(Double(size) / Double(meta.expected), 0), 1)
+    }
+
+    /// 暂停：取消当前请求，但**保留已下载的字节**。
+    /// 下次 `download` 会按 Range 从头续上，进度不会丢。
+    func pause(artifactID: Int) {
+        lock.lock()
+        let task = runningTasks[artifactID]
+        lock.unlock()
+        task?.cancel()
     }
 
     func discard(artifactID: Int) {
@@ -92,6 +104,7 @@ final class ResumableDownloader: NSObject, @unchecked Sendable {
             task.taskDescription = "\(artifactID)|\(source)"
 
             lock.lock()
+            runningTasks[artifactID] = task
             states[task.taskIdentifier] = TaskState(
                 artifactID: artifactID,
                 sourceURL: source,
@@ -220,14 +233,21 @@ extension ResumableDownloader: URLSessionDataDelegate {
         let key = task.taskIdentifier
         lock.lock()
         let state = states.removeValue(forKey: key)
+        if let state { runningTasks[state.artifactID] = nil }
         lock.unlock()
         guard let state else { return }
 
         try? state.handle?.close()
 
         if let error {
-            // 取消 / 断网：文件留在原地，下次接着下
-            state.continuation?.resume(throwing: error)
+            // 用户主动暂停 → 抛 CancellationError，上层据此切到「已暂停」，
+            // 而不是当成一次失败去弹重试。
+            if (error as? URLError)?.code == .cancelled {
+                state.continuation?.resume(throwing: CancellationError())
+            } else {
+                // 断网：文件留在原地，下次接着下
+                state.continuation?.resume(throwing: error)
+            }
             return
         }
 

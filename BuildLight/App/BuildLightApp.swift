@@ -52,18 +52,18 @@ struct RootView: View {
             UNUserNotificationCenter.current().delegate = NotificationDelegate.shared
             await environment.session.refreshIdentityIfNeeded()
             await NotificationService.shared.prepareIfNeeded()
+            // 冷启动时 scenePhase 初始就是 .active，onChange 不会触发。
+            // 不在这里补一次，第一次打开根本不会开始轮询。
+            guard environment.session.isSignedIn else { return }
+            environment.monitor.start()
+            await environment.monitor.refreshAll()
         }
         .onChange(of: scenePhase) { _, phase in
-            switch phase {
-            case .active:
-                guard environment.session.isSignedIn else { return }
-                environment.monitor.start()
-                    Task { await environment.monitor.refreshAll() }
-            default:
-                // 进后台不主动停轮询：系统挂起进程后循环自然停，醒着的那几十秒
-                // 还能抓到构建完成并弹本地通知。
-                break
-            }
+            guard phase == .active, environment.session.isSignedIn else { return }
+            environment.monitor.start()
+            // 回前台立刻全量刷一遍：挂起期间数据是旧的，
+            // 用户第一眼看到的必须是真实状态，而不是几秒前的快照。
+            Task { await environment.monitor.refreshAll() }
         }
     }
 }

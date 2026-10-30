@@ -22,8 +22,9 @@ struct RunRowView: View {
             Spacer(minLength: 8)
 
             VStack(alignment: .trailing, spacing: 2) {
-                Text(duration)
-                    .font(.system(size: 13, weight: .medium).monospacedDigit())
+                durationText
+                    .font(.system(size: 13, weight: .medium))
+                    .monospacedDigit()
                     .foregroundStyle(tone ?? .secondary)
                 Text(whenText)
                     .font(.system(size: 11))
@@ -67,13 +68,16 @@ struct RunRowView: View {
         return parts.joined(separator: " · ")
     }
 
-    private var duration: String {
-        guard let start = run.startedAt else {
-            return run.isActive ? "排队" : "—"
+    /// 运行中用系统计时文本，前后台切换后仍然准确。
+    @ViewBuilder
+    private var durationText: some View {
+        if run.isActive, let start = run.startedAt {
+            Text(timerInterval: start...Date.distantFuture, countsDown: false)
+        } else if let start = run.startedAt {
+            Text(RepoDurationText.clock(from: start, to: run.updatedAt))
+        } else {
+            Text(run.isActive ? "排队" : "—")
         }
-        let end = run.isActive ? Date.now : run.updatedAt
-        let total = max(0, Int(end.timeIntervalSince(start)))
-        return "\(total / 60):\(String(format: "%02d", total % 60))"
     }
 
     private var whenText: String {

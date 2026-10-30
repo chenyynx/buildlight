@@ -102,22 +102,32 @@ struct RunDetailView: View {
                 .lineLimit(3)
                 .padding(.top, 2)
 
-            if run.isActive {
-                TimelineView(.periodic(from: run.startedAt ?? run.createdAt, by: 1)) { context in
-                    durationLine(now: context.date)
+            if run.isActive, let start = run.startedAt {
+                durationLine {
+                    Text(timerInterval: start...Date.distantFuture, countsDown: false)
+                        .monospacedDigit()
+                }
+            } else if run.isActive {
+                // 排队中：还没有 startedAt，用创建时间起算，但只是静态显示
+                durationLine {
+                    Text(RepoDurationText.clock(from: run.createdAt, to: .now))
+                        .monospacedDigit()
                 }
             } else {
-                durationLine(now: run.updatedAt)
+                durationLine {
+                    Text(RepoDurationText.clock(from: run.startedAt ?? run.createdAt, to: run.updatedAt))
+                        .monospacedDigit()
+                }
             }
         }
         .padding(.horizontal, DS.pad)
         .padding(.top, 8)
     }
 
-    private func durationLine(now: Date) -> some View {
+    private func durationLine<Value: View>(@ViewBuilder value: () -> Value) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(elapsed(now: now))
-                .font(.system(size: 34, weight: .semibold).monospacedDigit())
+            value()
+                .font(.system(size: 34, weight: .semibold))
                 .foregroundStyle(run.isActive ? accent.primary : .primary)
             Text(run.isActive ? (run.startedAt == nil ? "排队中" : "进行中") : "总耗时")
                 .font(.system(size: 11))
@@ -197,18 +207,6 @@ struct RunDetailView: View {
         case .failure, .timedOut: return StatusTone.failed
         default: return StatusTone.idle
         }
-    }
-
-    private func elapsed(now: Date) -> String {
-        guard let start = run.startedAt else {
-            return "排队 \(shortInterval(from: run.createdAt, to: now))"
-        }
-        return shortInterval(from: start, to: now)
-    }
-
-    private func shortInterval(from start: Date, to end: Date) -> String {
-        let total = max(0, Int(end.timeIntervalSince(start)))
-        return "\(total / 60):\(String(format: "%02d", total % 60))"
     }
 
     private var owner: String {

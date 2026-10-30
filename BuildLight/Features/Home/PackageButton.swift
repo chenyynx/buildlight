@@ -43,18 +43,35 @@ struct PackageButton: View {
             Button {
                 environment.packages.start(target)
             } label: {
-                DownloadRing(progress: progress, size: compact ? 22 : 32, lineWidth: compact ? 2 : 3)
+                DownloadRing(
+                    progress: progress,
+                    size: compact ? 22 : 32,
+                    lineWidth: compact ? 2 : 3,
+                    symbol: "play.fill"
+                )
             }
             .buttonStyle(.plain)
             .accessibilityLabel("已下载 \(Int(progress * 100))%，点击继续")
 
         case .downloading(let progress):
-            DownloadRing(progress: progress, size: compact ? 22 : 32, lineWidth: compact ? 2 : 3)
-                .accessibilityLabel("正在下载 \(Int(progress * 100))%")
+            // 下载中变成「暂停」按钮：能点，点了保留已下载字节。
+            Button {
+                environment.packages.pause(target.id)
+            } label: {
+                DownloadRing(
+                    progress: progress,
+                    size: compact ? 22 : 32,
+                    lineWidth: compact ? 2 : 3,
+                    symbol: "pause.fill"
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("暂停下载")
 
         case .unzipping:
             ProgressView()
                 .controlSize(.mini)
+                .frame(width: compact ? 22 : 32)
                 .accessibilityLabel("正在解压")
 
         case .ready(let url):

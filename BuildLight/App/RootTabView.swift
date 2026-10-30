@@ -46,8 +46,12 @@ struct RootTabView: View {
             }
         }
         .background(LiveActivitySync())
-        .task(id: DeepLinkRouter.shared.pending) {
-            await handleDeepLink()
+        .onChange(of: DeepLinkRouter.shared.pending) { _, _ in
+            resolvePendingDeepLink()
+        }
+        .task {
+            // 冷启动：通知在 Scene 建立前就到了，onChange 不会触发。
+            resolvePendingDeepLink()
         }
         .alert("找不到这次构建", isPresented: $deepLinkMissed) {
             Button("好") {}
@@ -68,10 +72,10 @@ struct RootTabView: View {
 
     /// 处理一次深链。
     ///
-    /// 三步：本地找 → 找不到按 runID 从 API 补拉 → 都没有才提示。
-    /// 之前这里只做第一步，冷启动时数据还没同步到，`guard` 直接 return，
-    /// 点击就静默丢失了。
-    private func handleDeepLink() async {
+    /// **先同步取走意图，再启动独立 Task 做异步补拉**。
+    /// 如果把 consume 放进 `.task(id: pending)` 里，清空 pending 会让 id 变化、
+    /// SwiftUI 顺手取消这个任务——正在进行的补拉请求会被当场掐断。
+    private func resolvePendingDeepLink() {
         guard let pending = DeepLinkRouter.shared.consume() else { return }
 
         if let run = runs.first(where: { $0.id == pending.runID }) {
@@ -84,13 +88,15 @@ struct RootTabView: View {
             return
         }
 
-        if let fetched = await environment.monitor.ensureRun(
-            repoFullName: fullName,
-            runID: pending.runID
-        ) {
-            deepLinkedRun = fetched
-        } else {
-            deepLinkMissed = true
+        Task {
+            if let fetched = await environment.monitor.ensureRun(
+                repoFullName: fullName,
+                runID: pending.runID
+            ) {
+                deepLinkedRun = fetched
+            } else {
+                deepLinkMissed = true
+            }
         }
     }
 }

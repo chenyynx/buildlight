@@ -1,23 +1,14 @@
 import SwiftUI
-import UIKit
 
 /// 品牌色：只在交互元素上用（按钮、选中态、链接），不参与状态表达。
-enum Accent {
-    static let primary = Color(uiColor: UIColor { trait in
-        trait.userInterfaceStyle == .dark
-            ? UIColor(red: 0.85, green: 0.47, blue: 0.56, alpha: 1)
-            : UIColor(red: 0.56, green: 0.18, blue: 0.25, alpha: 1)
-    })
-    static let soft = primary.opacity(0.12)
-
-    static var gradient: LinearGradient {
-        LinearGradient(colors: [primary, primary.opacity(0.7)],
-                       startPoint: .topLeading, endPoint: .bottomTrailing)
-    }
-}
-
-/// 状态色：全 App 只有两个。
-/// 正在跑 = 琥珀（和品牌酒红、失败红都拉开色相）；失败 = 砖红；完成 = 中性。
+///
+/// 强调色由用户在设置页切换，共七款；具体值在 `AccentTheme`。
+/// 视图通过环境变量 `@Environment(\.accent)` 取当前值，
+/// 不要直接引用 `Accent.primary` 这样的全局常量。
+/// 状态色：全 App 只有两个信号色。
+/// 正在跑 = 琥珀（和任何强调色都拉开色相）；失败 = 砖红；完成 = 中性。
+/// 状态色**不跟随强调色**，否则用户把强调色切成红色时，
+/// 「在跑」和「失败」会长得一模一样。
 enum StatusTone {
     static let running = dynamic(light: 0xB4691F, dark: 0xE0A063)
     static let failed = dynamic(light: 0xA63A2E, dark: 0xF0736A)
@@ -65,38 +56,39 @@ extension Font {
     static var tag: Font { .caption.weight(.medium) }
 }
 
-/// 纸张底色：浅色是暖白，深色是近黑。整屏一层，不叠卡片。
+/// 屏幕底色：浅色是暖白，深色是近黑。整屏一层，不叠卡片。
 struct PaperBackground: View {
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.accent) private var accent
 
     var body: some View {
-        (scheme == .dark
-            ? Color(red: 0.045, green: 0.045, blue: 0.05)
-            : Color(red: 0.972, green: 0.961, blue: 0.945))
+        ZStack {
+            (scheme == .dark
+                ? Color(red: 0.045, green: 0.045, blue: 0.05)
+                : Color(red: 0.972, green: 0.961, blue: 0.945))
+                .ignoresSafeArea()
+
+            // 强调色晕：玻璃要折射出东西，背后得有东西。
+            RadialGradient(
+                colors: [accent.wash, .clear],
+                center: .topTrailing,
+                startRadius: 0,
+                endRadius: 520
+            )
             .ignoresSafeArea()
+            .allowsHitTesting(false)
+        }
     }
 }
 
 /// 行按压反馈：轻微缩放 + 变暗，比默认高亮更像「按下去」。
 struct PressableStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.985 : 1)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.985 : 1)
             .opacity(configuration.isPressed ? 0.72 : 1)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
-    }
-}
-
-extension View {
-    func cardSurface(
-        cornerRadius: CGFloat = Metrics.radiusL,
-        fill: AnyShapeStyle = AnyShapeStyle(.quaternary.opacity(0.45))
-    ) -> some View {
-        self
-            .background(fill, in: .rect(cornerRadius: cornerRadius))
-            .overlay {
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .strokeBorder(.white.opacity(0.06), lineWidth: 0.5)
-            }
+            .animation(reduceMotion ? .easeOut(duration: 0.12) : Motion.press, value: configuration.isPressed)
     }
 }

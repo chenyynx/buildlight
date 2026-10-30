@@ -5,7 +5,9 @@ import SwiftUI
 struct DownloadProgressBar: View {
     let progress: Double
     var height: CGFloat = 6
-    var tint: Color = Accent.primary
+    var tint: Color?
+
+    @Environment(\.accent) private var accent
 
     private var clamped: Double { min(max(progress, 0), 1) }
 
@@ -16,12 +18,12 @@ struct DownloadProgressBar: View {
                 Capsule()
                     .fill(.quaternary)
                 Capsule()
-                    .fill(tint)
+                    .fill(tint ?? accent.primary)
                     .frame(width: max(height, width * clamped))
             }
         }
         .frame(height: height)
-        .animation(.easeOut(duration: 0.18), value: clamped)
+        .animation(Motion.smooth, value: clamped)
         .accessibilityElement()
         .accessibilityLabel("下载进度")
         .accessibilityValue("\(Int(clamped * 100))%")
@@ -34,6 +36,8 @@ struct DownloadRing: View {
     var size: CGFloat = 30
     var lineWidth: CGFloat = 3
 
+    @Environment(\.accent) private var accent
+
     private var clamped: Double { min(max(progress, 0), 1) }
 
     var body: some View {
@@ -42,9 +46,9 @@ struct DownloadRing: View {
                 .stroke(.quaternary, lineWidth: lineWidth)
             Circle()
                 .trim(from: 0, to: clamped)
-                .stroke(Accent.primary, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                .stroke(accent.primary, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-                .animation(.easeOut(duration: 0.18), value: clamped)
+                .animation(Motion.smooth, value: clamped)
             Text("\(Int(clamped * 100))")
                 .font(.system(size: 9, weight: .semibold))
                 .monospacedDigit()

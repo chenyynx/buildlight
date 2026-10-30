@@ -1,6 +1,12 @@
 import SwiftData
 import SwiftUI
 
+/// 首页：产物优先的双层结构。
+///
+/// 第一层（吸顶面板 + 「可安装」区）回答「现在能装什么」；
+/// 第二层（其余仓库）回答「还有什么在动」。
+///
+/// 相比旧版把 19 个仓库平铺成列表，这样用户滚不到一半就能拿到包。
 struct HomeView: View {
     @Environment(AppEnvironment.self) private var environment
     @Query(sort: \RepoRecord.sortIndex) private var repos: [RepoRecord]
@@ -10,18 +16,21 @@ struct HomeView: View {
     @State private var isSyncing = false
 
     var body: some View {
-        let items = filteredRepos
-        let running = items.filter(\.isRunning)
-        let recent = items.filter { !$0.isRunning }
-
         NavigationStack {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0, pinnedViews: []) {
-                    statsStrip
-                    freshnessLine
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    HomeHeroPanel(
+                        readyCount: sections.ready.count,
+                        runningCount: sections.running.count,
+                        failedCount: failingCount,
+                        totalCount: visibleRepos.count,
+                        lastRefresh: environment.monitor.lastRefreshAt
+                    )
+                    .padding(.top, 4)
+
                     filterBar
 
-                    if items.isEmpty {
+                    if sections.isEmpty {
                         ContentUnavailableView {
                             Label("没有匹配的仓库", systemImage: "shippingbox")
                         } description: {
@@ -30,19 +39,7 @@ struct HomeView: View {
                         .padding(.top, 48)
                     }
 
-                    if !running.isEmpty {
-                        SectionLabel("正在构建")
-                        ForEach(running) { repo in
-                            row(repo)
-                        }
-                    }
-
-                    if !recent.isEmpty {
-                        SectionLabel(running.isEmpty ? "全部仓库" : "最近完成")
-                        ForEach(recent) { repo in
-                            row(repo)
-                        }
-                    }
+                    cardGroups
                 }
                 .padding(.bottom, Metrics.tabBarClearance)
             }
@@ -75,47 +72,47 @@ struct HomeView: View {
         }
     }
 
-    private func row(_ repo: RepoRecord) -> some View {
-        NavigationLink(value: repo.fullName) {
-            RepoRowView(repo: repo)
+    // MARK: 分组
+
+    @ViewBuilder
+    private var cardGroups: some View {
+        if !sections.actionable.isEmpty {
+            SectionLabel("可安装", trailing: "\(sections.actionable.count)")
+            ForEach(sections.actionable) { section in
+                card(section)
+            }
         }
-        .buttonStyle(.plain)
+
+        if !sections.running.isEmpty {
+            SectionLabel("正在构建", trailing: "\(sections.running.count)")
+            ForEach(sections.running) { section in
+                card(section)
+            }
+        }
+
+        if !sections.idle.isEmpty {
+            SectionLabel(
+                sections.actionable.isEmpty && sections.running.isEmpty ? "全部仓库" : "其余仓库",
+                trailing: "\(sections.idle.count)"
+            )
+            ForEach(sections.idle) { section in
+                card(section)
+            }
+        }
     }
 
-    /// 顶部三个数字。没有胶囊、没有图标、没有底色——
-    /// 数字本身就是信息，装饰只会稀释它。
-    private var statsStrip: some View {
-        HStack(spacing: 0) {
-            MetricCell(value: "\(activeCount)", label: "在跑", tint: activeCount > 0 ? StatusTone.running : nil)
-            VerticalRule()
-            MetricCell(value: "\(failingCount)", label: "失败", tint: failingCount > 0 ? StatusTone.failed : nil)
-            VerticalRule()
-            MetricCell(value: "\(visibleRepos.count)", label: "仓库")
+    private func card(_ section: HomeSection) -> some View {
+        NavigationLink(value: section.repo.fullName) {
+            RepoCardContainer(repo: section.repo) {
+                RepoCard(repo: section.repo)
+            }
         }
+        .buttonStyle(PressableStyle())
         .padding(.horizontal, DS.pad)
-        .padding(.top, 4)
         .padding(.bottom, 10)
     }
 
-    /// 让人知道数据是活的。没有这行，一个不动的数字很容易被当成卡死。
-    private var freshnessLine: some View {
-        TimelineView(.periodic(from: .now, by: 5)) { context in
-            Text(freshness(context.date))
-                .font(.system(size: 11))
-                .foregroundStyle(.quaternary)
-                .padding(.horizontal, DS.pad)
-                .padding(.bottom, 10)
-        }
-    }
-
-    private func freshness(_ now: Date) -> String {
-        guard let last = environment.monitor.lastRefreshAt else { return "尚未刷新" }
-        let seconds = Int(now.timeIntervalSince(last))
-        if seconds < 5 { return "刚刚更新" }
-        if seconds < 60 { return "\(seconds) 秒前更新" }
-        if seconds < 3600 { return "\(seconds / 60) 分钟前更新" }
-        return "\(seconds / 3600) 小时前更新"
-    }
+    // MARK: 筛选
 
     private var filterBar: some View {
         Picker("筛选", selection: $filter) {
@@ -125,43 +122,44 @@ struct HomeView: View {
         }
         .pickerStyle(.segmented)
         .padding(.horizontal, DS.pad)
-        .padding(.bottom, 14)
+        .padding(.top, 16)
+        .padding(.bottom, 4)
     }
 
-    private var activeCount: Int {
-        visibleRepos.reduce(0) { $0 + $1.activeRunCount }
-    }
-
-    private var failingCount: Int {
-        visibleRepos.filter(\.latestFailed).count
-    }
+    // MARK: 数据
 
     private var visibleRepos: [RepoRecord] {
         repos.filter { !$0.isHidden }
     }
 
     private var filteredRepos: [RepoRecord] {
-        var items = visibleRepos
+        visibleRepos.filter { repo in
+            let matchesSearch = searchText.isEmpty
+                || repo.displayName.localizedStandardContains(searchText)
+                || repo.fullName.localizedStandardContains(searchText)
+            guard matchesSearch else { return false }
 
-        switch filter {
-        case .all:
-            break
-        case .running:
-            items = items.filter(\.isRunning)
-        case .failing:
-            items = items.filter(\.latestFailed)
-        }
-
-        if !searchText.isEmpty {
-            items = items.filter { $0.fullName.localizedCaseInsensitiveContains(searchText) }
-        }
-
-        // 在跑的顶到最前，其余按最近一次构建排序
-        return items.sorted { lhs, rhs in
-            if lhs.isRunning != rhs.isRunning { return lhs.isRunning }
-            return (lhs.latestRunAt ?? .distantPast) > (rhs.latestRunAt ?? .distantPast)
+            switch filter {
+            case .all: return true
+            case .running: return repo.isRunning
+            case .failing: return repo.latestFailed
+            }
         }
     }
+
+    private var sections: HomeSections {
+        HomeSections.make(from: filteredRepos) { repo in
+            guard let id = repo.packageID else { return false }
+            if case .ready = environment.packages.state(for: id) { return true }
+            return false
+        }
+    }
+
+    private var failingCount: Int {
+        visibleRepos.count(where: { $0.latestFailed })
+    }
+
+    // MARK: 行为
 
     private func sync() async {
         isSyncing = true

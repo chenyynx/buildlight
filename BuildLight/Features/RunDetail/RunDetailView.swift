@@ -3,6 +3,7 @@ import SwiftData
 
 struct RunDetailView: View {
     @Environment(AppEnvironment.self) private var environment
+    @Environment(\.accent) private var accent
     let run: RunRecord
 
     @State private var jobs: [WorkflowJob] = []
@@ -142,7 +143,7 @@ struct RunDetailView: View {
             Link(destination: run.htmlURL) {
                 Text("在浏览器中打开")
                     .font(.system(size: 14))
-                    .foregroundStyle(Accent.primary)
+                    .foregroundStyle(accent.primary)
                     .frame(maxWidth: .infinity)
                     .frame(height: 40)
             }

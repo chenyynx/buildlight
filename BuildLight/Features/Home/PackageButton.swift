@@ -4,6 +4,7 @@ import SwiftUI
 /// compact 用在卡片上，只留一个 12pt 的纤细图标，不跟大数字抢位置。
 struct PackageButton: View {
     @Environment(AppEnvironment.self) private var environment
+    @Environment(\.accent) private var accent
     let target: PackageTarget
     var compact: Bool = false
 
@@ -15,11 +16,11 @@ struct PackageButton: View {
             } label: {
                 Image(systemName: "arrow.down")
                     .font(.system(size: compact ? 12 : 14, weight: .semibold))
-                    .foregroundStyle(compact ? AnyShapeStyle(.secondary) : AnyShapeStyle(Accent.primary))
+                    .foregroundStyle(compact ? AnyShapeStyle(.secondary) : AnyShapeStyle(accent.primary))
                     .frame(width: compact ? 22 : 34, height: compact ? 22 : 34)
                     .background {
                         if !compact {
-                            Circle().fill(Accent.soft)
+                            Circle().fill(accent.soft)
                         }
                     }
             }
@@ -48,11 +49,11 @@ struct PackageButton: View {
             ShareLink(item: url) {
                 Image(systemName: "square.and.arrow.up")
                     .font(.system(size: compact ? 12 : 14, weight: .semibold))
-                    .foregroundStyle(Accent.primary)
+                    .foregroundStyle(accent.primary)
                     .frame(width: compact ? 22 : 34, height: compact ? 22 : 34)
                     .background {
                         if !compact {
-                            Circle().fill(Accent.soft)
+                            Circle().fill(accent.soft)
                         }
                     }
             }

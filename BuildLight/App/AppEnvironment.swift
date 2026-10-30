@@ -13,6 +13,8 @@ final class AppEnvironment {
     let packages: PackageService
     let cache: CacheStore
     let repos: RepoService
+    /// 外观（强调色、动效开关）。全局唯一，App 启动时读一次。
+    let appearance: AppearanceStore
 
     init(container: ModelContainer) {
         self.container = container
@@ -28,5 +30,6 @@ final class AppEnvironment {
         self.monitor = BuildMonitor(context: context, session: session)
         self.packages = PackageService(session: session, cache: cache)
         self.repos = RepoService(context: context, session: session)
+        self.appearance = AppearanceStore()
     }
 }

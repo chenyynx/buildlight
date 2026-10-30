@@ -29,6 +29,12 @@ struct BuildLightApp: App {
 struct RootView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.colorScheme) private var colorScheme
+
+    /// 当前生效的强调色。切主题时整个 App 立刻跟着变。
+    private var accent: Accent {
+        environment.appearance.accent(for: colorScheme)
+    }
 
     var body: some View {
         Group {
@@ -38,6 +44,8 @@ struct RootView: View {
                 RootTabView()
             }
         }
+        .environment(\.accent, accent)
+        .environment(\.reducesMotion, environment.appearance.reduceMotionEnabled)
         .task {
             await environment.session.refreshIdentityIfNeeded()
             await NotificationService.shared.prepareIfNeeded()

@@ -3,6 +3,7 @@ import SwiftData
 
 struct RepoDetailView: View {
     @Environment(AppEnvironment.self) private var environment
+    @Environment(\.accent) private var accent
     @Query private var runs: [RunRecord]
     @Environment(\.openURL) private var openURL
 
@@ -137,7 +138,7 @@ struct RepoDetailView: View {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "shippingbox.fill")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Accent.primary)
+                    .foregroundStyle(accent.primary)
                     .padding(.top, 2)
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -211,7 +212,7 @@ struct RepoDetailView: View {
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
                 .frame(height: 46)
-                .background(Accent.primary, in: .rect(cornerRadius: 13))
+                .background(accent.primary, in: .rect(cornerRadius: 13))
             }
             .buttonStyle(PressableStyle())
         case .failed(let error):

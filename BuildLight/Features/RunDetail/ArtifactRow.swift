@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ArtifactRow: View {
     @Environment(AppEnvironment.self) private var environment
+    @Environment(\.accent) private var accent
     let artifact: ArtifactRecord
 
     private var state: PackageService.State {
@@ -21,7 +22,7 @@ struct ArtifactRow: View {
 
                 Text(detail)
                     .font(.system(size: 11.5))
-                    .foregroundStyle(isDownloading ? AnyShapeStyle(Accent.primary) : AnyShapeStyle(.tertiary))
+                    .foregroundStyle(isDownloading ? AnyShapeStyle(accent.primary) : AnyShapeStyle(.tertiary))
                     .monospacedDigit()
                     .lineLimit(1)
 

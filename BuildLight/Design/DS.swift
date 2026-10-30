@@ -3,9 +3,9 @@ import SwiftUI
 /// 全局排版规则。所有页面只用这里面的积木，避免每页各写一套。
 ///
 /// 规则：
-/// - 左右边距 20，分组标题 11pt 宽字距，行高 16/13
+/// - 左右边距 20，分组标题 11pt 宽字距
 /// - 数字一律等宽（monospacedDigit），避免跳动
-/// - 分隔用 0.5pt 发丝线，不用卡片、不用阴影、不用玻璃
+/// - 分隔用 0.5pt 发丝线，不用卡片、不用阴影
 /// - 只有两个信号色：琥珀=在跑，砖红=失败
 enum DS {
     static let pad: CGFloat = 20
@@ -14,20 +14,34 @@ enum DS {
 
 struct SectionLabel: View {
     let title: String
+    var trailing: String?
 
     init(_ title: String) {
         self.title = title
     }
 
+    init(_ title: String, trailing: String?) {
+        self.title = title
+        self.trailing = trailing
+    }
+
     var body: some View {
-        Text(title)
-            .font(.system(size: 11, weight: .semibold))
-            .tracking(1.2)
-            .foregroundStyle(.tertiary)
-            .padding(.horizontal, DS.pad)
-            .padding(.top, 22)
-            .padding(.bottom, 8)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        HStack {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .tracking(1.2)
+                .foregroundStyle(.tertiary)
+            Spacer(minLength: 8)
+            if let trailing {
+                Text(trailing)
+                    .font(.system(size: 11))
+                    .monospacedDigit()
+                    .foregroundStyle(.quaternary)
+            }
+        }
+        .padding(.horizontal, DS.pad)
+        .padding(.top, 22)
+        .padding(.bottom, 8)
     }
 }
 
@@ -101,8 +115,10 @@ struct VerticalRule: View {
 struct PrimaryButton: View {
     let title: String
     var systemImage: String?
-    var tint: Color = Accent.primary
+    var tint: Color?
     let action: () -> Void
+
+    @Environment(\.accent) private var accent
 
     var body: some View {
         Button(action: action) {
@@ -117,9 +133,9 @@ struct PrimaryButton: View {
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .frame(height: 46)
-            .background(tint, in: .rect(cornerRadius: 13))
+            .background(tint ?? accent.primary, in: .rect(cornerRadius: 13))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableStyle())
     }
 }
 

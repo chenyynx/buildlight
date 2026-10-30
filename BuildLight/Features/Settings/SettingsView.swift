@@ -5,6 +5,7 @@ import SwiftData
 struct SettingsView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.openURL) private var openURL
+    @Environment(\.colorScheme) private var colorScheme
     @Query(sort: \RepoRecord.sortIndex) private var repos: [RepoRecord]
 
     @AppStorage(NotificationService.storageKey) private var notifyBuildEvents = true
@@ -20,6 +21,16 @@ struct SettingsView: View {
                         title: "设置",
                         subtitle: loginSubtitle
                     )
+
+                    SectionLabel("外观")
+                    GlassSurface(level: .panel, cornerRadius: Metrics.radiusL) {
+                        VStack(alignment: .leading, spacing: 14) {
+                            AccentThemePicker(selection: themeBinding)
+                            GlassHairline()
+                            motionRow
+                        }
+                    }
+                    .padding(.horizontal, DS.pad)
 
                     SectionLabel("账号")
                     GroupBox2 {
@@ -49,7 +60,7 @@ struct SettingsView: View {
                         } label: {
                             FunctionRow(
                                 systemImage: "arrow.triangle.2.circlepath",
-                                tint: Accent.primary,
+                                tint: accent.primary,
                                 title: "同步全部仓库",
                                 value: isSyncing ? "同步中" : "\(visibleCount) 个"
                             )
@@ -156,6 +167,56 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: 外观
+
+    /// 主题绑定走 store，而不是 `@AppStorage`——
+    /// `@Observable` 类里用 `@AppStorage` 不会触发视图刷新。
+    private var themeBinding: Binding<AccentTheme> {
+        Binding(
+            get: { environment.appearance.theme },
+            set: { environment.appearance.theme = $0 }
+        )
+    }
+
+    private var accent: Accent {
+        environment.appearance.accent(for: colorScheme)
+    }
+
+    private var motionRow: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "waveform.path")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 26, height: 26)
+                .background(accent.primary, in: .rect(cornerRadius: 7))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("减弱动效")
+                    .font(.system(size: 15))
+                Text("关掉循环动画和入场位移")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+            }
+
+            Spacer(minLength: 8)
+
+            Toggle("", isOn: motionBinding)
+                .labelsHidden()
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 12)
+    }
+
+    private var motionBinding: Binding<Bool> {
+        Binding(
+            get: { environment.appearance.reduceMotionEnabled },
+            set: { environment.appearance.reduceMotionEnabled = $0 }
+        )
+    }
+
+    // MARK: 杂项
+
     private func glyph(_ name: String, tint: Color) -> some View {
         Image(systemName: name)
             .font(.system(size: 13, weight: .semibold))
@@ -172,7 +233,7 @@ struct SettingsView: View {
     }
 
     private var visibleCount: Int {
-        repos.filter { !$0.isHidden }.count
+        repos.count { !$0.isHidden }
     }
 
     private var appVersion: String {

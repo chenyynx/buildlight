@@ -3,6 +3,7 @@ import SwiftData
 
 enum AppTab: Hashable {
     case builds
+    case packages
     case history
     case settings
 }
@@ -14,7 +15,7 @@ struct RootTabView: View {
     @State private var selection: AppTab = .builds
 
     private var activeCount: Int {
-        runs.filter(\.isActive).count
+        runs.count(where: { $0.isActive })
     }
 
     var body: some View {
@@ -23,9 +24,15 @@ struct RootTabView: View {
                 HomeView()
             }
             .badge(activeCount)
+
+            Tab("产物", systemImage: "shippingbox", value: AppTab.packages) {
+                PackagesView()
+            }
+
             Tab("历史", systemImage: "clock.arrow.circlepath", value: AppTab.history) {
                 HistoryView()
             }
+
             Tab("设置", systemImage: "gearshape", value: AppTab.settings) {
                 SettingsView()
             }

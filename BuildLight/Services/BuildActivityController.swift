@@ -32,7 +32,9 @@ final class BuildActivityController {
             finishedCount: finishedCount,
             failedCount: failedCount
         )
-        let content = ActivityContent(state: state, staleDate: Date().addingTimeInterval(600))
+        // 3 分钟收不到更新就让系统把它置灰：App 挂起后没人能结束它，
+        // 不设过期的话锁屏上的计时会一直往下走，看着像构建永远跑不完。
+        let content = ActivityContent(state: state, staleDate: Date().addingTimeInterval(180))
 
         if let activity {
             await activity.update(content)

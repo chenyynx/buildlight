@@ -18,6 +18,7 @@ struct HomeView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0, pinnedViews: []) {
                     statsStrip
+                    freshnessLine
                     filterBar
 
                     if items.isEmpty {
@@ -112,6 +113,26 @@ struct HomeView: View {
         Rectangle()
             .fill(.quaternary.opacity(0.6))
             .frame(width: 0.5, height: 28)
+    }
+
+    /// 让人知道数据是活的。没有这行，一个不动的数字很容易被当成卡死。
+    private var freshnessLine: some View {
+        TimelineView(.periodic(from: .now, by: 5)) { context in
+            Text(freshness(context.date))
+                .font(.system(size: 11))
+                .foregroundStyle(.quaternary)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 10)
+        }
+    }
+
+    private func freshness(_ now: Date) -> String {
+        guard let last = environment.monitor.lastRefreshAt else { return "尚未刷新" }
+        let seconds = Int(now.timeIntervalSince(last))
+        if seconds < 5 { return "刚刚更新" }
+        if seconds < 60 { return "\(seconds) 秒前更新" }
+        if seconds < 3600 { return "\(seconds / 60) 分钟前更新" }
+        return "\(seconds / 3600) 小时前更新"
     }
 
     private var filterBar: some View {

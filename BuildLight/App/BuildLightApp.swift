@@ -47,7 +47,7 @@ struct RootView: View {
             case .active:
                 guard environment.session.isSignedIn else { return }
                 environment.monitor.start()
-                    Task { await environment.monitor.refreshNow() }
+                    Task { await environment.monitor.refreshAll() }
             default:
                 // 进后台不主动停轮询：系统挂起进程后循环自然停，醒着的那几十秒
                 // 还能抓到构建完成并弹本地通知。

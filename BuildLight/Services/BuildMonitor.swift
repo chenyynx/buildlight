@@ -89,6 +89,19 @@ final class BuildMonitor {
         await tick()
     }
 
+    /// 回到前台时用：把所有仓库都刷一遍，而不是每轮只刷 6 个。
+    /// 否则刚回来那几秒里，已经结束的构建还会显示成「进行中」，计时器继续走。
+    func refreshAll() async {
+        nextPollAt.removeAll()
+        for _ in 0..<5 {
+            let all = (try? context.fetch(FetchDescriptor<RepoRecord>())) ?? []
+            let now = Date()
+            let pending = all.filter { !$0.isHidden && (nextPollAt[$0.fullName] ?? .distantPast) <= now }
+            if pending.isEmpty { break }
+            await tick()
+        }
+    }
+
     // MARK: 单个仓库
 
     private func refresh(repo: RepoRecord, client: GitHubClient) async {

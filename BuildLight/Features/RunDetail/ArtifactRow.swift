@@ -30,7 +30,7 @@ struct ArtifactRow: View {
                 } else if case .downloading(let progress) = state {
                     DownloadProgressBar(progress: progress, height: 4)
                         .padding(.top, 1)
-                    Text("下载中 \(Int(progress * 100))% · \(artifact.sizeText)")
+                    Text(downloadLine(progress))
                         .font(.caption)
                         .monospacedDigit()
                         .foregroundStyle(Accent.primary)
@@ -66,6 +66,15 @@ struct ArtifactRow: View {
         }
         .padding(.vertical, 2)
         .animation(.easeOut(duration: 0.18), value: state)
+    }
+
+    private func downloadLine(_ progress: Double) -> String {
+        var parts = ["下载中 \(Int(progress * 100))%"]
+        if let speed = environment.packages.speed(for: artifact.id), let text = ByteRate.text(speed) {
+            parts.append(text)
+        }
+        parts.append(artifact.sizeText)
+        return parts.joined(separator: " · ")
     }
 
     private var subtitle: String {

@@ -35,7 +35,8 @@ struct RepoRowView: View {
                 )
                 Text(whenText)
                     .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(downloading ? AnyShapeStyle(Accent.primary) : AnyShapeStyle(.tertiary))
+                    .monospacedDigit()
                     .lineLimit(1)
             }
 
@@ -85,7 +86,18 @@ struct RepoRowView: View {
         return parts.joined(separator: " · ")
     }
 
+    private var downloading: Bool {
+        guard let target else { return false }
+        if case .downloading = environment.packages.state(for: target.id) { return true }
+        return false
+    }
+
     private var whenText: String {
+        if downloading, let target,
+           let speed = environment.packages.speed(for: target.id),
+           let text = ByteRate.text(speed) {
+            return text
+        }
         guard let started = repo.latestStartedAt else {
             return repo.latestRunAt == nil ? "—" : "等待 runner"
         }

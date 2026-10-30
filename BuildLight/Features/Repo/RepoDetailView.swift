@@ -99,7 +99,7 @@ struct RepoDetailView: View {
                         .opacity(0.55)
                         .padding(.top, 2)
                 case .downloading(let progress):
-                    Text("下载中 \(Int(progress * 100))% · \(packageSizeText)")
+                    Text(downloadLine(progress: progress, artifactID: target.id))
                         .font(.caption)
                         .monospacedDigit()
                         .foregroundStyle(Accent.primary)
@@ -120,6 +120,15 @@ struct RepoDetailView: View {
             PackageButton(target: target)
         }
         .padding(.vertical, 2)
+    }
+
+    private func downloadLine(progress: Double, artifactID: Int) -> String {
+        var parts = ["下载中 \(Int(progress * 100))%"]
+        if let speed = environment.packages.speed(for: artifactID), let text = ByteRate.text(speed) {
+            parts.append(text)
+        }
+        parts.append(packageSizeText)
+        return parts.joined(separator: " · ")
     }
 
     private var packageSizeText: String {

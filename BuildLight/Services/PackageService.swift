@@ -22,6 +22,8 @@ final class PackageService {
     /// 进度每 1% 才写一次状态：URLSession 的回调是每个数据块一次，
     /// 原样透传会让整墙卡片每秒重绘几十次。
     private var lastProgress: [Int: Double] = [:]
+    /// 实时速率（字节/秒），只用于展示。
+    private var speeds: [Int: Double] = [:]
 
     private let session: GitHubSession
     private let cache: CacheStore
@@ -30,6 +32,11 @@ final class PackageService {
     init(session: GitHubSession, cache: CacheStore) {
         self.session = session
         self.cache = cache
+    }
+
+    func speed(for artifactID: Int) -> Double? {
+        guard let speed = speeds[artifactID], speed > 1 else { return nil }
+        return speed
     }
 
     func state(for artifactID: Int) -> State {
@@ -71,9 +78,10 @@ final class PackageService {
     /// 先走后台通道；它 12 秒没动静就在内部判死刑并抛错，这里当场换成普通会话，
     /// 用户不需要再点一次。
     private func download(_ request: URLRequest, target: PackageTarget) async throws -> URL {
-        let progress: @Sendable (Double) -> Void = { [weak self] value in
+        let progress: @Sendable (Double, Double) -> Void = { [weak self] value, bytesPerSecond in
             Task { @MainActor [weak self] in
                 guard let self, case .downloading = self.states[target.id] else { return }
+                self.speeds[target.id] = bytesPerSecond
                 let previous = self.lastProgress[target.id] ?? 0
                 guard value >= 1 || value - previous >= 0.01 else { return }
                 self.lastProgress[target.id] = value
@@ -99,6 +107,7 @@ final class PackageService {
         tasks[artifactID]?.cancel()
         tasks[artifactID] = nil
         lastProgress[artifactID] = nil
+        speeds[artifactID] = nil
         states[artifactID] = nil
         downloader.discard(artifactID: artifactID)
         cache.remove(artifactID)

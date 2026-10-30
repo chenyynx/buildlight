@@ -27,7 +27,10 @@ final class ResumableDownloader: NSObject, @unchecked Sendable {
         var expected: Int64
         var received: Int64
         var handle: FileHandle?
-        var onProgress: (@Sendable (Double) -> Void)?
+        var lastSampleAt = Date()
+        var lastSampleBytes: Int64 = 0
+        var speed: Double = 0
+        var onProgress: (@Sendable (Double, Double) -> Void)?
         var continuation: CheckedContinuation<URL, Error>?
     }
 
@@ -67,7 +70,7 @@ final class ResumableDownloader: NSObject, @unchecked Sendable {
     func download(
         artifactID: Int,
         request: URLRequest,
-        onProgress: @escaping @Sendable (Double) -> Void
+        onProgress: @escaping @Sendable (Double, Double) -> Void
     ) async throws -> URL {
         let source = request.url?.absoluteString ?? ""
         let part = partURL(artifactID)
@@ -190,14 +193,27 @@ extension ResumableDownloader: URLSessionDataDelegate {
         }
         state.received += Int64(data.count)
         state.handle?.write(data)
+
+        // 每 0.4 秒采一次速度，再做指数平滑，避免数字乱跳
+        let now = Date()
+        let elapsed = now.timeIntervalSince(state.lastSampleAt)
+        if elapsed >= 0.4 {
+            let delta = Double(state.received - state.lastSampleBytes)
+            let instant = delta / elapsed
+            state.speed = state.speed == 0 ? instant : state.speed * 0.7 + instant * 0.3
+            state.lastSampleAt = now
+            state.lastSampleBytes = state.received
+        }
+
         let total = state.expected
         let received = state.received
+        let speed = state.speed
         let handler = state.onProgress
         states[key] = state
         lock.unlock()
 
         guard total > 0 else { return }
-        handler?(min(max(Double(received) / Double(total), 0), 1))
+        handler?(min(max(Double(received) / Double(total), 0), 1), speed)
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {

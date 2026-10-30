@@ -151,6 +151,7 @@ struct RepoListView: View {
 }
 
 private struct RepoManageRow: View {
+    @Environment(\.accent) private var accent
     let repo: RepoRecord
 
     var body: some View {

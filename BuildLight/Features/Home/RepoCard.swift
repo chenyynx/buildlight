@@ -193,6 +193,7 @@ struct RepoCard: View {
 /// 不只靠颜色区分（要考虑「不使用颜色区分」的无障碍设置）：
 /// 在跑是呼吸圆点、失败是叉、其余是空心圈，形状本身就带信息。
 struct StatusGlyph: View {
+    @Environment(\.accent) private var accent
     let repo: RepoRecord
 
     var body: some View {

@@ -26,17 +26,22 @@ struct RepoCard: View {
     var body: some View {
         GlassSurface(level: .card, cornerRadius: Metrics.radiusL) {
             VStack(alignment: .leading, spacing: 0) {
-                mainRow
-                if let target {
-                    packageStrip(target)
+                VStack(alignment: .leading, spacing: 0) {
+                    mainRow
+                    if let target {
+                        packageStrip(target)
+                    }
                 }
+                .padding(16)
+
                 if repo.isRunning {
-                    IndeterminateBar(height: 2)
-                        .padding(.top, 10)
+                    // 贴卡片底边、由卡片圆角裁剪的光带。
+                    // 不再塞进内边距里——那样左右会缩进，和圆角对不上。
+                    IndeterminateBar(height: 3)
                 }
             }
-            .padding(16)
         }
+        .clipShape(.rect(cornerRadius: Metrics.radiusL))
     }
 
     // MARK: 主行

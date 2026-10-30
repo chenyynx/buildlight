@@ -33,36 +33,60 @@ struct PulsingDot: View {
     }
 }
 
-/// 不确定进度的跑马灯：一道高光从左扫到右，表示「在动，但不知道还剩多久」。
-/// GitHub 不给实时百分比，假装一个进度反而更糟。
+/// 不确定进度的「光带」。
+///
+/// GitHub 不给实时百分比，假装一个进度反而更糟，
+/// 所以这里表达的是「在动」而不是「完成了多少」。
+///
+/// **为什么是一条贴着卡底边的光带**：
+/// 旧版把它塞在卡片内边距里，左右各缩进 16pt，
+/// 既没对齐圆角、又在浅色卡上露出一条硬邦邦的浅色轨，
+/// 看起来像排版错误而不是进度指示。
+/// 现在整条贴在卡片底边、由卡片自己的圆角裁剪，
+/// 光带两端淡出，不做轨道、不做胶囊——
+/// 它读起来是卡片在「呼吸」，而不是一个没做完的进度条。
 struct IndeterminateBar: View {
     var color: Color = StatusTone.running
-    var height: CGFloat = 4
-    var duration: Double = 1.6
+    var height: CGFloat = 3
+    var duration: Double = 2.2
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var phase: CGFloat = -0.45
+    @State private var phase: CGFloat = -0.5
 
     var body: some View {
         GeometryReader { proxy in
             let width = proxy.size.width
-            Capsule()
-                .fill(color.opacity(reduceMotion ? 0.55 : 0.16))
-                .overlay(alignment: .leading) {
-                    if !reduceMotion {
-                        Capsule()
-                            .fill(color)
-                            .frame(width: width * 0.38)
-                            .offset(x: width * phase)
-                    }
+
+            ZStack(alignment: .leading) {
+                // 常驻的极淡底光：静态时也能看出这条边是「活的」
+                LinearGradient(
+                    colors: [color.opacity(0.06), color.opacity(0.16), color.opacity(0.06)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+
+                if !reduceMotion {
+                    LinearGradient(
+                        stops: [
+                            .init(color: color.opacity(0), location: 0),
+                            .init(color: color.opacity(0.55), location: 0.35),
+                            .init(color: color, location: 0.5),
+                            .init(color: color.opacity(0.55), location: 0.65),
+                            .init(color: color.opacity(0), location: 1)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                    .frame(width: width * 0.55)
+                    .offset(x: width * phase)
                 }
-                .clipShape(Capsule())
+            }
         }
         .frame(height: height)
         .onAppear {
             guard !reduceMotion else { return }
             withAnimation(.linear(duration: duration).repeatForever(autoreverses: false)) {
-                phase = 1.02
+                phase = 1.0
             }
         }
         .accessibilityHidden(true)

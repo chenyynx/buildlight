@@ -11,6 +11,9 @@ struct RepoDetailView: View {
     @Query private var runs: [RunRecord]
     @Environment(\.openURL) private var openURL
 
+    /// 待确认的远端操作。取消/重跑都会真的影响 CI，不能一滑就执行。
+    @State private var pendingAction: PendingAction?
+
     private let repo: RepoRecord
 
     init(repo: RepoRecord) {
@@ -49,6 +52,18 @@ struct RepoDetailView: View {
                     .listRowInsets(EdgeInsets())
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        if run.isActive {
+                            Button("取消", systemImage: "xmark", role: .destructive) {
+                                pendingAction = .cancel(run)
+                            }
+                        } else {
+                            Button("重跑", systemImage: "arrow.clockwise") {
+                                pendingAction = .rerun(run)
+                            }
+                            .tint(StatusTone.running)
+                        }
+                    }
                 }
             } header: {
                 SectionLabel("构建记录")
@@ -66,6 +81,26 @@ struct RepoDetailView: View {
             }
         }
         .refreshable { await environment.monitor.refreshNow() }
+        .confirmationDialog(
+            pendingAction?.title ?? "",
+            isPresented: Binding(
+                get: { pendingAction != nil },
+                set: { if !$0 { pendingAction = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let action = pendingAction {
+                Button(action.confirmTitle, role: action.isDestructive ? .destructive : nil) {
+                    Task { await action.perform(environment) }
+                    pendingAction = nil
+                }
+                Button("取消", role: .cancel) { pendingAction = nil }
+            }
+        } message: {
+            if let action = pendingAction {
+                Text(action.message)
+            }
+        }
         .overlay {
             if filteredRuns.isEmpty {
                 ContentUnavailableView(

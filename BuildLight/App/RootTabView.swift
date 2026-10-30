@@ -20,8 +20,10 @@ struct RootTabView: View {
     @State private var deepLinkedRun: RunRecord?
     @State private var deepLinkMissed = false
 
+    /// 角标口径必须和首页「在跑」一致：都数仓库，不数 run。
+    /// 一个仓库同时跑两个 workflow 时，数 run 会显示 2、首页显示 1，看着像 bug。
     private var activeCount: Int {
-        runs.count(where: { $0.isActive })
+        Set(runs.filter(\.isActive).map(\.repoFullName)).count
     }
 
     var body: some View {
@@ -40,7 +42,7 @@ struct RootTabView: View {
             }
 
             Tab("设置", systemImage: "gearshape", value: AppTab.settings) {
-                SettingsView()
+                SettingsView(onOpenPackages: { selection = .packages })
             }
         }
         .background(LiveActivitySync())

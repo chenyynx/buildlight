@@ -51,7 +51,9 @@ struct RepoListView: View {
             } header: {
                 Text("跟踪中 · \(visibleRepos.count)")
             } footer: {
-                Text("左滑隐藏或移除，拖动排序。隐藏的仓库不再轮询，也不会出现在首页。")
+                // `.onMove` 只在编辑态生效。之前没给编辑入口，
+                // 页脚却写着「拖动排序」，等于空头承诺。
+                Text("左滑隐藏或移除；点右上角「排序」后可拖动调整顺序。")
             }
 
             if !hiddenRepos.isEmpty {
@@ -85,6 +87,9 @@ struct RepoListView: View {
                 Button("添加", systemImage: "plus") {
                     showingAddSheet = true
                 }
+            }
+            ToolbarItem(placement: .topBarLeading) {
+                EditButton()
             }
         }
         .sheet(isPresented: $showingAddSheet) {

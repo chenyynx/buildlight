@@ -15,6 +15,8 @@ struct HomeView: View {
     @State private var filter: RepoFilter = .all
     @State private var isSyncing = false
     @State private var toast: RefreshToast.Outcome?
+    /// 每次提示一个序号，延迟清理时校验，避免旧定时器把新提示清掉。
+    @State private var toastToken = 0
 
     var body: some View {
         NavigationStack {
@@ -37,7 +39,12 @@ struct HomeView: View {
                             .padding(.top, 10)
                     }
 
-                    MonitorErrorBanner(errors: environment.monitor.errors)
+                    MonitorErrorBanner(errors: environment.monitor.errors) {
+                        Task {
+                            let changed = await refresh()
+                            show(.success(updatedCount: changed))
+                        }
+                    }
 
                     filterBar
 
@@ -223,10 +230,15 @@ struct HomeView: View {
 
     /// 成功 1.8 秒后自动收起；失败常驻，让用户看清原因。
     private func show(_ outcome: RefreshToast.Outcome) {
+        toastToken += 1
+        let token = toastToken
         withAnimation(Motion.settle) { toast = outcome }
         guard case .success = outcome else { return }
         Task {
             try? await Task.sleep(for: .seconds(1.8))
+            // 这期间如果又弹了新提示（比如刷新失败的常驻条），
+            // 旧定时器必须放手，不能把新的那条一起清掉。
+            guard toastToken == token else { return }
             withAnimation(Motion.settle) { toast = nil }
         }
     }

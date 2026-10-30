@@ -7,9 +7,23 @@ import SwiftUI
 /// 只在有错时出现，且只占一行，不打断浏览。
 struct MonitorErrorBanner: View {
     let errors: [String: AppError]
+    var onRetry: () -> Void = {}
 
+    /// 取「最严重」的一条，而不是字典里随机那一条。
+    /// 未授权 > 限流 > 断网 > 其他——用户能采取行动的顺序。
     private var representative: AppError? {
-        errors.values.first
+        errors.values.min { lhs, rhs in
+            severity(lhs) < severity(rhs)
+        }
+    }
+
+    private func severity(_ error: AppError) -> Int {
+        switch error {
+        case .unauthorized: 0
+        case .rateLimited: 1
+        case .offline: 2
+        default: 3
+        }
     }
 
     var body: some View {
@@ -28,9 +42,22 @@ struct MonitorErrorBanner: View {
                         .font(Type.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
+                    if errors.count > 1 {
+                        Text("另有 \(errors.count - 1) 个仓库同样失败")
+                            .font(Type.caption)
+                            .foregroundStyle(.tertiary)
+                    }
                 }
 
-                Spacer(minLength: 0)
+                Spacer(minLength: 4)
+
+                Button("重试", action: onRetry)
+                    .font(Type.caption.weight(.semibold))
+                    .buttonStyle(.plain)
+                    .foregroundStyle(StatusTone.failed)
+                    .padding(.horizontal, 10)
+                    .frame(height: 28)
+                    .background(StatusTone.failed.opacity(0.12), in: .capsule)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)

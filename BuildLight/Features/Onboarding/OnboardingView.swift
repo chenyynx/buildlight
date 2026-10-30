@@ -11,6 +11,7 @@ struct OnboardingView: View {
     @State private var token = ""
     @State private var error: AppError?
     @State private var isWorking = false
+    @State private var statusText = ""
 
     var body: some View {
         NavigationStack {
@@ -34,7 +35,7 @@ struct OnboardingView: View {
                                     .foregroundStyle(StatusTone.failed)
                             }
 
-                            PrimaryButton(title: isWorking ? "验证中…" : "连接 GitHub") {
+                            PrimaryButton(title: isWorking ? statusText : "连接 GitHub") {
                                 submit()
                             }
                             .disabled(token.isEmpty || isWorking)
@@ -92,11 +93,17 @@ struct OnboardingView: View {
     private func submit() {
         isWorking = true
         error = nil
+        statusText = "验证中…"
         Task {
             defer { isWorking = false }
             do {
                 try await environment.session.signIn(with: token)
+                // 登录成功不等于能用：不把仓库拉下来，首页就是一片空白，
+                // 用户还得自己去设置里找「同步全部仓库」。
+                statusText = "同步仓库…"
+                try? await environment.repos.syncAll()
                 environment.monitor.start()
+                await environment.monitor.refreshNow()
             } catch {
                 self.error = AppError.map(error)
             }

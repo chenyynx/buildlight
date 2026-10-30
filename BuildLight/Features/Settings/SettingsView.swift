@@ -3,6 +3,8 @@ import SwiftUI
 import SwiftData
 
 struct SettingsView: View {
+    /// 由 RootTabView 注入：点了「已下载的包」直接切到产物 Tab。
+    var onOpenPackages: () -> Void = {}
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.openURL) private var openURL
     @Environment(\.colorScheme) private var colorScheme
@@ -137,7 +139,11 @@ struct SettingsView: View {
 
                     SectionLabel("存储")
                     GroupBox2 {
-                        NavigationLink(value: SettingsRoute.cache) {
+                        // 不再进第二套缓存页：和在「产物」Tab 里看到的是同一批文件，
+                        // 两套 UI 的删除/清空行为还不一致，容易误操作。
+                        Button {
+                            onOpenPackages()
+                        } label: {
                             FunctionRow(
                                 systemImage: "internaldrive.fill",
                                 tint: .orange,
@@ -173,7 +179,6 @@ struct SettingsView: View {
             .navigationBarTitleDisplayMode(.large)
             .navigationDestination(for: SettingsRoute.self) { route in
                 switch route {
-                case .cache: CacheView()
                 case .repos: RepoListView()
                 }
             }

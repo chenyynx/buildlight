@@ -90,6 +90,14 @@ struct RepoDetailView: View {
                     .lineLimit(1)
 
                 switch environment.packages.state(for: target.id) {
+                case .paused(let progress):
+                    Text("已下载 \(Int(progress * 100))% · \(packageSizeText) · 点右侧继续")
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                    DownloadProgressBar(progress: progress, height: 3)
+                        .opacity(0.55)
+                        .padding(.top, 2)
                 case .downloading(let progress):
                     Text("下载中 \(Int(progress * 100))% · \(packageSizeText)")
                         .font(.caption)

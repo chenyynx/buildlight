@@ -26,6 +26,15 @@ struct PackageButton: View {
             .buttonStyle(.plain)
             .accessibilityLabel("下载构建产物")
 
+        case .paused(let progress):
+            Button {
+                environment.packages.start(target)
+            } label: {
+                DownloadRing(progress: progress, size: compact ? 22 : 32, lineWidth: compact ? 2 : 3)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("已下载 \(Int(progress * 100))%，点击继续")
+
         case .downloading(let progress):
             DownloadRing(progress: progress, size: compact ? 22 : 32, lineWidth: compact ? 2 : 3)
 

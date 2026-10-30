@@ -9,6 +9,8 @@ import ZIPFoundation
 final class PackageService {
     enum State: Equatable {
         case idle
+        /// 上次没下完，进度在磁盘上，点一下接着下
+        case paused(Double)
         case downloading(Double)
         case unzipping
         case ready(URL)
@@ -23,8 +25,7 @@ final class PackageService {
 
     private let session: GitHubSession
     private let cache: CacheStore
-    /// 后台通道不响应时的兜底：普通会话 + 真进度。
-    private let fallback = ArtifactDownloader()
+    private let downloader = ResumableDownloader.shared
 
     init(session: GitHubSession, cache: CacheStore) {
         self.session = session
@@ -34,6 +35,7 @@ final class PackageService {
     func state(for artifactID: Int) -> State {
         if let state = states[artifactID] { return state }
         if let url = cache.url(for: artifactID) { return .ready(url) }
+        if let progress = downloader.progressOnDisk(for: artifactID) { return .paused(progress) }
         return .idle
     }
 
@@ -44,8 +46,9 @@ final class PackageService {
             return
         }
 
-        states[target.id] = .downloading(0)
-        lastProgress[target.id] = 0
+        // 有半截文件就从它的进度接着显示，不要跳回 0% 骗人
+        lastProgress[target.id] = downloader.progressOnDisk(for: target.id) ?? 0
+        states[target.id] = .downloading(lastProgress[target.id] ?? 0)
         tasks[target.id] = Task { [weak self] in
             guard let self else { return }
             defer { self.tasks[target.id] = nil }
@@ -78,41 +81,18 @@ final class PackageService {
             }
         }
 
-        // 后台会话（BackgroundDownloadCenter）在自签/企业签环境下不可靠：
-        // 进度回调正常、字节也下完了，但「文件交付」回调永远不来，
-        // 表现就是卡在 100%。在拿到开发者证书之前不启用它。
-        // 折中方案：普通会话 + 后台任务断言，切走 App 后还有约 30 秒宽限。
+        // 字节直接落盘，App 被杀也丢不了；下次进来按 Range 续传。
         let assertion = UIApplication.shared.beginBackgroundTask(withName: "artifact-download")
         defer {
             if assertion != .invalid {
                 UIApplication.shared.endBackgroundTask(assertion)
             }
         }
-        return try await fallback.download(request, onProgress: progress)
-    }
-
-    /// App 回到前台时调用：把系统在后台替我们下完的文件解压入库。
-    /// 解压不在后台做——ZIPFoundation 不适合在被挂起的进程里跑。
-    func resumeBackgroundDownloads() {
-        for pending in BackgroundDownloadCenter.pendingDownloads() {
-            guard tasks[pending.artifactID] == nil else { continue }
-            guard BackgroundDownloadCenter.takePending(artifactID: pending.artifactID) != nil else { continue }
-
-            states[pending.artifactID] = .unzipping
-            tasks[pending.artifactID] = Task { [weak self] in
-                guard let self else { return }
-                defer { self.tasks[pending.artifactID] = nil }
-                do {
-                    let stored = try self.finalize(
-                        zipURL: URL(fileURLWithPath: pending.path),
-                        id: pending.artifactID
-                    )
-                    self.states[pending.artifactID] = .ready(stored)
-                } catch {
-                    self.states[pending.artifactID] = .failed(AppError.map(error))
-                }
-            }
-        }
+        return try await downloader.download(
+            artifactID: target.id,
+            request: request,
+            onProgress: progress
+        )
     }
 
     func reset(_ artifactID: Int) {
@@ -120,6 +100,7 @@ final class PackageService {
         tasks[artifactID] = nil
         lastProgress[artifactID] = nil
         states[artifactID] = nil
+        downloader.discard(artifactID: artifactID)
         cache.remove(artifactID)
     }
 

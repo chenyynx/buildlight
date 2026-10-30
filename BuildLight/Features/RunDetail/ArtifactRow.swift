@@ -19,7 +19,15 @@ struct ArtifactRow: View {
                     .font(.subheadline)
                     .lineLimit(1)
 
-                if case .downloading(let progress) = state {
+                if case .paused(let progress) = state {
+                    DownloadProgressBar(progress: progress, height: 4)
+                        .opacity(0.55)
+                        .padding(.top, 1)
+                    Text("已下载 \(Int(progress * 100))% · \(artifact.sizeText) · 点右侧继续")
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                } else if case .downloading(let progress) = state {
                     DownloadProgressBar(progress: progress, height: 4)
                         .padding(.top, 1)
                     Text("下载中 \(Int(progress * 100))% · \(artifact.sizeText)")

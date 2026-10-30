@@ -33,6 +33,8 @@ final class BuildMonitor {
     private var pausedUntil: Date?
     /// 第一次见到某个仓库时不发通知，否则刚装 App 会把历史失败全推一遍。
     private var primedRepos: Set<String> = []
+    /// 已经提醒过的包，避免同一份产物反复弹。
+    private var announcedPackages: Set<Int> = []
     private var loop: Task<Void, Never>?
 
     private let activeInterval: TimeInterval = 3
@@ -128,6 +130,9 @@ final class BuildMonitor {
     private func refresh(repo: RepoRecord, client: GitHubClient) async {
         do {
             let runs = try await client.runs(owner: repo.owner, repo: repo.name, perPage: historyLimit)
+            // 必须在 apply 之前取：apply 里会把这个仓库标记成「已见过」，
+            // 之后再判断就永远是 true，于是装完 App 会把历史包全推一遍。
+            let wasPrimed = primedRepos.contains(repo.fullName)
             apply(runs: runs, to: repo)
             lastSuccess[repo.fullName] = .now
             lastFailure[repo.fullName] = nil
@@ -141,7 +146,12 @@ final class BuildMonitor {
                 nextPollAt[repo.fullName] = Date().addingTimeInterval(hasActive ? activeInterval : idleInterval)
             }
 
-            await loadArtifacts(for: Array(runs.prefix(2)), repo: repo, client: client)
+            await loadArtifacts(
+                for: Array(runs.prefix(2)),
+                repo: repo,
+                client: client,
+                announce: wasPrimed
+            )
         } catch {
             let mapped = AppError.map(error)
             // 取消不算失败：切后台、切主题触发的重刷都会取消在途请求。
@@ -259,7 +269,12 @@ final class BuildMonitor {
         }
     }
 
-    private func loadArtifacts(for runs: [WorkflowRun], repo: RepoRecord, client: GitHubClient) async {
+    private func loadArtifacts(
+        for runs: [WorkflowRun],
+        repo: RepoRecord,
+        client: GitHubClient,
+        announce: Bool
+    ) async {
         for run in runs {
             let runID = run.id
             guard let artifacts = try? await client.artifacts(
@@ -289,6 +304,28 @@ final class BuildMonitor {
             if runID == repo.latestRunID {
                 if let best = bestPackage(in: artifacts) {
                     if repo.packageID != best.id {
+                        // 包刚出现 → 立刻提醒。
+                        // 这是这个 App 最有价值的一条通知：
+                        // upload-artifact 通常在整条 run 结束前几分钟就完成，
+                        // 等 run 完成再通知，用户白等一大截。
+                        // 首次见到这个仓库时不推，否则装完 App 会把历史包全推一遍。
+                        if announce, !announcedPackages.contains(best.id) {
+                            announcedPackages.insert(best.id)
+                            let message = (
+                                repo: repo.displayName,
+                                name: best.name,
+                                size: best.sizeInBytes,
+                                number: run.runNumber
+                            )
+                            Task {
+                                await NotificationService.shared.notifyPackageReady(
+                                    repo: message.repo,
+                                    name: message.name,
+                                    sizeBytes: message.size,
+                                    runNumber: message.number
+                                )
+                            }
+                        }
                         repo.packageID = best.id
                         repo.packageName = best.name
                         repo.packageURL = best.archiveDownloadUrl

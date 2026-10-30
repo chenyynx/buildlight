@@ -150,14 +150,24 @@ struct RepoDetailView: View {
                         .foregroundStyle(accent.primary)
                         .padding(.top, 2)
 
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 3) {
                         Text(target.name)
                             .font(.system(size: 15, weight: .semibold))
                             .lineLimit(1)
-                        Text(packageDetail(target))
+
+                        // 一眼看出这个包是哪次构建、哪条分支出来的。
+                        // 之前只有文件名和大小，取错包还得回列表比对。
+                        Text(buildLine)
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                             .monospacedDigit()
+                            .lineLimit(1)
+
+                        Text(packageDetail(target))
+                            .font(.system(size: 12))
+                            .foregroundStyle(.tertiary)
+                            .monospacedDigit()
+                            .lineLimit(1)
                     }
                     Spacer(minLength: 0)
                 }
@@ -168,6 +178,17 @@ struct RepoDetailView: View {
         }
         .padding(.horizontal, DS.pad)
         .padding(.top, 14)
+    }
+
+    /// 「#63 · main · e5a28c4」。
+    private var buildLine: String {
+        var parts: [String] = []
+        if repo.latestNumber > 0 { parts.append("#\(repo.latestNumber)") }
+        if let branch = repo.latestBranch, !branch.isEmpty { parts.append(branch) }
+        if let run = filteredRuns.first(where: { $0.id == repo.latestRunID }) {
+            parts.append(String(run.sha.prefix(7)))
+        }
+        return parts.isEmpty ? "最新构建" : parts.joined(separator: " · ")
     }
 
     private func packageDetail(_ target: PackageTarget) -> String {

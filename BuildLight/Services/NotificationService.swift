@@ -64,6 +64,32 @@ final class NotificationService {
         return pendingRunID
     }
 
+    /// 安装包就绪通知。
+    ///
+    /// 和「构建完成」分开：包通常比整条 run 早几分钟生成，
+    /// 这是用户真正在等的那个时刻。
+    func notifyPackageReady(repo: String, name: String, sizeBytes: Int, runNumber: Int) async {
+        guard isEnabled, isAuthorized else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = "安装包就绪 · \(repo)"
+        var parts: [String] = []
+        if runNumber > 0 { parts.append("#\(runNumber)") }
+        parts.append(name)
+        parts.append(ByteCountFormatter.string(fromByteCount: Int64(sizeBytes), countStyle: .file))
+        content.body = parts.joined(separator: " · ")
+        content.sound = .default
+        content.threadIdentifier = "package-\(repo)"
+        content.userInfo = ["repo": repo]
+
+        let request = UNNotificationRequest(
+            identifier: "package-\(repo)-\(name)-\(runNumber)",
+            content: content,
+            trigger: nil
+        )
+        try? await UNUserNotificationCenter.current().add(request)
+    }
+
     func notify(_ event: BuildEvent) async {
         guard isEnabled, isAuthorized else { return }
 

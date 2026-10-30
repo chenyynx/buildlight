@@ -18,7 +18,7 @@ struct BuildActivityWidget: Widget {
                 )
         } dynamicIsland: { context in
             let accent = context.state.accent(for: .dark)
-            DynamicIsland {
+            return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     Label("构建中", systemImage: "hammer.fill")
                         .font(.system(size: 12, weight: .semibold))

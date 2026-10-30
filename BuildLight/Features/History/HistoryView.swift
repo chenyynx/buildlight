@@ -1,6 +1,10 @@
 import SwiftUI
 import SwiftData
 
+/// 历史页：按仓库分组的历史记录。
+///
+/// 保留 `List` 而不是卡片墙：历史页是低频查阅场景，
+/// 信息密度比视觉冲击更重要。分组头用系统 Section header。
 struct HistoryView: View {
     @Query(sort: \RunRecord.createdAt, order: .reverse) private var runs: [RunRecord]
 

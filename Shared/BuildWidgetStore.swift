@@ -8,7 +8,7 @@ import WidgetKit
 /// 自签包没有 entitlement），所以用 `App Group` 之外的兜底方案：
 /// App 每次刷新后把最近状态写成 JSON 放在**共享容器**里。
 /// 没有 App Group 时退回 `UserDefaults(suiteName:)`，自签环境同样可用。
-struct BuildWidgetEntry: TimelineEntry {
+struct BuildWidgetEntry: TimelineEntry, Codable {
     let date: Date
     let runningCount: Int
     let failedCount: Int
@@ -26,7 +26,7 @@ struct BuildWidgetEntry: TimelineEntry {
     )
 }
 
-struct BuildWidgetItem: Codable, Identifiable, Hashable {
+struct BuildWidgetItem: Codable, Identifiable, Hashable, Sendable {
     var id: String { repo }
     let repo: String
     let branch: String

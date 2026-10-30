@@ -1,6 +1,10 @@
 import SwiftUI
 import SwiftData
 
+/// 仓库详情页：仓库信息 + 最新产物 + 构建记录。
+///
+/// 顶部用玻璃面板承载「这个仓库现在的状态」，
+/// 下面是扁平的构建记录列表——记录是流水，列表比卡片更合适。
 struct RepoDetailView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.accent) private var accent
@@ -45,14 +49,6 @@ struct RepoDetailView: View {
                     .listRowInsets(EdgeInsets())
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
-                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                        if run.isActive {
-                            Button("取消", systemImage: "xmark", role: .destructive) { cancel(run) }
-                        } else {
-                            Button("重跑", systemImage: "arrow.clockwise") { rerun(run) }
-                                .tint(StatusTone.running)
-                        }
-                    }
                 }
             } header: {
                 SectionLabel("构建记录")
@@ -87,20 +83,24 @@ struct RepoDetailView: View {
         VStack(alignment: .leading, spacing: 10) {
             ScreenHeader(title: repo.displayName, subtitle: headerSubtitle)
 
-            HStack(spacing: 0) {
-                MetricCell(value: "\(filteredRuns.count)", label: "次构建")
-                VerticalRule()
-                MetricCell(
-                    value: "\(successCount)",
-                    label: "成功",
-                    tint: successCount > 0 ? nil : StatusTone.idle
-                )
-                VerticalRule()
-                MetricCell(
-                    value: "\(failureCount)",
-                    label: "失败",
-                    tint: failureCount > 0 ? StatusTone.failed : nil
-                )
+            GlassSurface(level: .panel, cornerRadius: Metrics.radiusL) {
+                HStack(spacing: 0) {
+                    MetricCell(value: "\(filteredRuns.count)", label: "次构建")
+                    VerticalRule()
+                    MetricCell(
+                        value: "\(successCount)",
+                        label: "成功",
+                        tint: successCount > 0 ? nil : StatusTone.idle
+                    )
+                    VerticalRule()
+                    MetricCell(
+                        value: "\(failureCount)",
+                        label: "失败",
+                        tint: failureCount > 0 ? StatusTone.failed : nil
+                    )
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
             }
             .padding(.horizontal, DS.pad)
             .padding(.bottom, 6)
@@ -116,11 +116,11 @@ struct RepoDetailView: View {
     }
 
     private var successCount: Int {
-        filteredRuns.filter { $0.conclusion == .success }.count
+        filteredRuns.count { $0.conclusion == .success }
     }
 
     private var failureCount: Int {
-        filteredRuns.filter { $0.conclusion == .failure || $0.conclusion == .timedOut }.count
+        filteredRuns.count { $0.conclusion == .failure || $0.conclusion == .timedOut }
     }
 
     // MARK: 最新产物
@@ -134,29 +134,30 @@ struct RepoDetailView: View {
     }
 
     private func packageBlock(_ target: PackageTarget) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: "shippingbox.fill")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(accent.primary)
-                    .padding(.top, 2)
+        GlassSurface(level: .card, cornerRadius: Metrics.radiusL) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "shippingbox.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(accent.primary)
+                        .padding(.top, 2)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(target.name)
-                        .font(.system(size: 15, weight: .semibold))
-                        .lineLimit(1)
-                    Text(packageDetail(target))
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(target.name)
+                            .font(.system(size: 15, weight: .semibold))
+                            .lineLimit(1)
+                        Text(packageDetail(target))
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
+                    Spacer(minLength: 0)
                 }
-                Spacer(minLength: 0)
-            }
 
-            packageAction(target)
+                packageAction(target)
+            }
+            .padding(16)
         }
-        .padding(16)
-        .background(.quaternary.opacity(0.22), in: .rect(cornerRadius: 16))
         .padding(.horizontal, DS.pad)
         .padding(.top, 14)
     }
@@ -232,15 +233,5 @@ struct RepoDetailView: View {
     private var filteredRuns: [RunRecord] {
         guard let filter = repo.workflowFilter, !filter.isEmpty else { return runs }
         return runs.filter { $0.workflowName == filter }
-    }
-
-    private func rerun(_ run: RunRecord) {
-        guard let client = environment.session.client else { return }
-        Task { try? await client.rerun(owner: repo.owner, repo: repo.name, runID: run.id) }
-    }
-
-    private func cancel(_ run: RunRecord) {
-        guard let client = environment.session.client else { return }
-        Task { try? await client.cancel(owner: repo.owner, repo: repo.name, runID: run.id) }
     }
 }

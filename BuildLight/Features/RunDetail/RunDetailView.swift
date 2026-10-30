@@ -1,6 +1,10 @@
 import SwiftUI
-import SwiftData
 
+/// 单次运行的详情页：耗时大数字 + 步骤流 + 产物 + 操作。
+///
+/// 「签名细节」：页面顶部的耗时是一个 34pt 的等宽数字，
+/// 跑动时它每秒走一次。它是这个页面唯一会动的东西——
+/// 构建进行中，用户需要的是「还在动」这一个确认。
 struct RunDetailView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.accent) private var accent

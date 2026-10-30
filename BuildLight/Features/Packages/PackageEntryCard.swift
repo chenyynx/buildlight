@@ -5,6 +5,7 @@ import SwiftUI
 /// 主操作是「导入」——直接把文件交给签名工具，不复制、不走剪贴板。
 struct PackageEntryCard: View {
     @Environment(AppEnvironment.self) private var environment
+    @Environment(\.accent) private var accent
     let entry: CacheStore.Entry
 
     var body: some View {

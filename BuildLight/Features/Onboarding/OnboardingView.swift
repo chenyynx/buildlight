@@ -1,7 +1,12 @@
 import SwiftUI
 
+/// 首次进入：只要一个 Token。
+///
+/// 刻意做成单屏单任务——登录是唯一阻塞项，
+/// 多一步说明就多一次流失。
 struct OnboardingView: View {
     @Environment(AppEnvironment.self) private var environment
+    @Environment(\.accent) private var accent
 
     @State private var token = ""
     @State private var error: AppError?
@@ -9,55 +14,79 @@ struct OnboardingView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    SecureField("github_pat_…", text: $token)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .font(.body.monospaced())
-                } header: {
-                    Text("Personal Access Token")
-                } footer: {
-                    Text("Fine-grained token，权限勾选 Actions: Read、Contents: Read、Metadata: Read。Token 只存在本机的 Keychain。")
-                }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    hero
 
-                if let error {
-                    Section {
-                        Text(error.localizedDescription)
-                            .font(.footnote)
-                            .foregroundStyle(.red)
-                    }
-                }
+                    GlassSurface(level: .panel, cornerRadius: Metrics.radiusL) {
+                        VStack(alignment: .leading, spacing: 14) {
+                            SecureField("github_pat_…", text: $token)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .font(.body.monospaced())
+                                .padding(.horizontal, 12)
+                                .frame(height: 44)
+                                .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 10))
 
-                Section {
-                    Button {
-                        submit()
-                    } label: {
-                        HStack {
-                            Spacer()
-                            if isWorking {
-                                ProgressView().controlSize(.small)
-                                    .padding(.trailing, 6)
+                            if let error {
+                                Text(error.localizedDescription)
+                                    .font(.footnote)
+                                    .foregroundStyle(StatusTone.failed)
                             }
-                            Text(isWorking ? "验证中…" : "继续")
-                            Spacer()
-                        }
-                    }
-                    .disabled(token.isEmpty || isWorking)
-                }
 
-                Section("需要的权限") {
-                    Label("Actions: Read", systemImage: "hammer")
-                    Label("Contents: Read", systemImage: "doc.text")
-                    Label("Metadata: Read", systemImage: "info.circle")
+                            PrimaryButton(title: isWorking ? "验证中…" : "连接 GitHub") {
+                                submit()
+                            }
+                            .disabled(token.isEmpty || isWorking)
+                            .opacity(token.isEmpty ? 0.5 : 1)
+                        }
+                        .padding(16)
+                    }
+                    .padding(.horizontal, DS.pad)
+                    .padding(.top, 20)
+
+                    SectionLabel("需要的权限")
+                    VStack(alignment: .leading, spacing: 8) {
+                        permissionRow("hammer", "Actions: Read")
+                        permissionRow("doc.text", "Contents: Read")
+                        permissionRow("info.circle", "Metadata: Read")
+                    }
+                    .padding(.horizontal, DS.pad + 4)
+
+                    Text("Token 只存在本机的 Keychain，不会离开这台设备。")
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(.tertiary)
+                        .padding(.horizontal, DS.pad)
+                        .padding(.top, 18)
                 }
+                .padding(.bottom, 48)
             }
-            .scrollContentBackground(.hidden)
-            .background { AccentBackdrop() }
-            .background(.background)
+            .scrollIndicators(.hidden)
+            .background(PaperBackground())
             .navigationTitle("连接 GitHub")
+            .navigationBarTitleDisplayMode(.inline)
         }
         .task { await environment.session.refreshIdentityIfNeeded() }
+    }
+
+    private var hero: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("BuildLight")
+                .font(.system(size: 30, weight: .bold))
+                .tracking(-0.8)
+            Text("盯着自己的几个仓库看构建：一屏知道谁在跑、有没有包可以取。")
+                .font(.system(size: 14))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, DS.pad)
+        .padding(.top, 18)
+    }
+
+    private func permissionRow(_ icon: String, _ title: String) -> some View {
+        Label(title, systemImage: icon)
+            .font(.system(size: 13))
+            .foregroundStyle(.secondary)
     }
 
     private func submit() {

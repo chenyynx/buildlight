@@ -135,12 +135,12 @@ struct RepoCard: View {
             : "安装包"
 
         switch packageState {
-        case .ready: "已就绪 · \(size)"
-        case .downloading(let progress): "下载中 \(Int(progress * 100))%"
-        case .paused(let progress): "已下载 \(Int(progress * 100))% · 可续传"
-        case .unzipping: "正在解压"
-        case .failed: "下载失败 · 点右侧重试"
-        default: "\(size) · 可安装"
+        case .ready: return "已就绪 · \(size)"
+        case .downloading(let progress): return "下载中 \(Int(progress * 100))%"
+        case .paused(let progress): return "已下载 \(Int(progress * 100))% · 可续传"
+        case .unzipping: return "正在解压"
+        case .failed: return "下载失败 · 点右侧重试"
+        default: return "\(size) · 可安装"
         }
     }
 

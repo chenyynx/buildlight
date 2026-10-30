@@ -8,6 +8,7 @@ struct RepoDurationText: View {
     let latestAt: Date?
     let isRunning: Bool
     var tint: Color? = nil
+    var size: CGFloat = 26
 
     var body: some View {
         Group {
@@ -21,7 +22,7 @@ struct RepoDurationText: View {
                 Text(latestAt == nil ? "—" : "排队")
             }
         }
-        .font(Font.system(size: 26, weight: .semibold).monospacedDigit())
+        .font(Font.system(size: size, weight: .semibold).monospacedDigit())
         .foregroundStyle(tint ?? .primary)
         .lineLimit(1)
         .minimumScaleFactor(0.7)

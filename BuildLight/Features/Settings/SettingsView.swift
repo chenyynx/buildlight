@@ -3,7 +3,6 @@ import SwiftUI
 import SwiftData
 
 struct SettingsView: View {
-    @Environment(\.accent) private var accent
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.openURL) private var openURL
     @Environment(\.colorScheme) private var colorScheme

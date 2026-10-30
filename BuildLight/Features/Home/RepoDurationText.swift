@@ -15,6 +15,8 @@ struct RepoDurationText: View {
     var tint: Color? = nil
     var size: CGFloat = 26
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     var body: some View {
         Group {
             if isRunning, let startedAt {
@@ -26,7 +28,10 @@ struct RepoDurationText: View {
                 Text(latestAt == nil ? "—" : "排队")
             }
         }
-        .font(.system(size: size, weight: .semibold))
+        .font(.system(
+            size: size * Type.scaleFactor(for: dynamicTypeSize),
+            weight: .semibold
+        ))
         .foregroundStyle(tint ?? .primary)
         .lineLimit(1)
         .minimumScaleFactor(0.7)

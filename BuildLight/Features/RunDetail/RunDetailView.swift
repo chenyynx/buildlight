@@ -46,7 +46,7 @@ struct RunDetailView: View {
 
                 if let loadError {
                     Text(loadError.localizedDescription)
-                        .font(.system(size: 12))
+                        .scaledFont(size: 12)
                         .foregroundStyle(StatusTone.failed)
                         .padding(.horizontal, DS.pad)
                         .padding(.top, 10)
@@ -103,16 +103,16 @@ struct RunDetailView: View {
             HStack(spacing: 6) {
                 Circle().fill(tone).frame(width: 6, height: 6)
                 Text(statusText)
-                    .font(.system(size: 12, weight: .semibold))
+                    .scaledFont(size: 12, weight: .semibold)
                     .foregroundStyle(tone)
                 Spacer()
                 Text(run.event)
-                    .font(.system(size: 11))
+                    .scaledFont(size: 11)
                     .foregroundStyle(.tertiary)
             }
 
             Text(run.title ?? run.workflowName ?? "#\(run.number)")
-                .font(.system(size: 21, weight: .semibold))
+                .scaledFont(size: 21, weight: .semibold)
                 .tracking(-0.3)
                 .lineLimit(3)
                 .padding(.top, 2)
@@ -142,10 +142,10 @@ struct RunDetailView: View {
     private func durationLine<Value: View>(@ViewBuilder value: () -> Value) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             value()
-                .font(.system(size: 34, weight: .semibold))
+                .scaledFont(size: 34, weight: .semibold)
                 .foregroundStyle(run.isActive ? accent.primary : .primary)
             Text(run.isActive ? (run.startedAt == nil ? "排队中" : "进行中") : "总耗时")
-                .font(.system(size: 11))
+                .scaledFont(size: 11)
                 .foregroundStyle(.tertiary)
         }
         .padding(.top, 4)
@@ -166,11 +166,11 @@ struct RunDetailView: View {
     private func metaRow(_ label: String, _ value: String) -> some View {
         HStack {
             Text(label)
-                .font(.system(size: 12))
+                .scaledFont(size: 12)
                 .foregroundStyle(.tertiary)
                 .frame(width: 52, alignment: .leading)
             Text(value)
-                .font(.system(size: 13))
+                .scaledFont(size: 13)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
             Spacer(minLength: 0)
@@ -195,7 +195,7 @@ struct RunDetailView: View {
 
             Link(destination: run.htmlURL) {
                 Text("在浏览器中打开")
-                    .font(.system(size: 14))
+                    .scaledFont(size: 14)
                     .foregroundStyle(accent.primary)
                     .frame(maxWidth: .infinity)
                     .frame(height: 40)

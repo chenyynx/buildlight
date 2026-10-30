@@ -12,16 +12,16 @@ struct ArtifactRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: "shippingbox")
-                .font(.system(size: 14))
+                .scaledFont(size: 14)
                 .foregroundStyle(.tertiary)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(artifact.name)
-                    .font(.system(size: 14, weight: .medium))
+                    .scaledFont(size: 14, weight: .medium)
                     .lineLimit(1)
 
                 Text(detail)
-                    .font(.system(size: 11.5))
+                    .scaledFont(size: 11.5)
                     .foregroundStyle(isDownloading ? AnyShapeStyle(accent.primary) : AnyShapeStyle(.tertiary))
                     .monospacedDigit()
                     .lineLimit(1)
@@ -40,7 +40,7 @@ struct ArtifactRow: View {
 
             if artifact.expired {
                 Text("已过期")
-                    .font(.system(size: 11))
+                    .scaledFont(size: 11)
                     .foregroundStyle(.tertiary)
             } else {
                 PackageButton(

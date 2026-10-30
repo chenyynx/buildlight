@@ -11,10 +11,10 @@ struct RunRowView: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.system(size: 15, weight: .medium))
+                    .scaledFont(size: 15, weight: .medium)
                     .lineLimit(1)
                 Text(meta)
-                    .font(.system(size: 12))
+                    .scaledFont(size: 12)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
@@ -23,11 +23,11 @@ struct RunRowView: View {
 
             VStack(alignment: .trailing, spacing: 2) {
                 durationText
-                    .font(.system(size: 13, weight: .medium))
+                    .scaledFont(size: 13, weight: .medium)
                     .monospacedDigit()
                     .foregroundStyle(tone ?? .secondary)
                 Text(whenText)
-                    .font(.system(size: 11))
+                    .scaledFont(size: 11)
                     .foregroundStyle(.tertiary)
             }
         }
@@ -41,7 +41,7 @@ struct RunRowView: View {
                 PulsingDot(color: accent.primary, size: 5)
             } else if isFailed {
                 Image(systemName: "xmark")
-                    .font(.system(size: 8, weight: .black))
+                    .scaledFont(size: 8, weight: .black)
                     .foregroundStyle(.white)
                     .frame(width: 14, height: 14)
                     .background(StatusTone.failed, in: .circle)

@@ -55,7 +55,7 @@ struct OnboardingView: View {
                     .padding(.horizontal, DS.pad + 4)
 
                     Text("Token 只存在本机的 Keychain，不会离开这台设备。")
-                        .font(.system(size: 11.5))
+                        .scaledFont(size: 11.5)
                         .foregroundStyle(.tertiary)
                         .padding(.horizontal, DS.pad)
                         .padding(.top, 18)
@@ -73,10 +73,10 @@ struct OnboardingView: View {
     private var hero: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("BuildLight")
-                .font(.system(size: 30, weight: .bold))
+                .scaledFont(size: 30, weight: .bold)
                 .tracking(-0.8)
             Text("盯着自己的几个仓库看构建：一屏知道谁在跑、有没有包可以取。")
-                .font(.system(size: 14))
+                .scaledFont(size: 14)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -86,7 +86,7 @@ struct OnboardingView: View {
 
     private func permissionRow(_ icon: String, _ title: String) -> some View {
         Label(title, systemImage: icon)
-            .font(.system(size: 13))
+            .scaledFont(size: 13)
             .foregroundStyle(.secondary)
     }
 

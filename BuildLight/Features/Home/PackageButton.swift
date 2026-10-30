@@ -17,6 +17,7 @@ struct PackageButton: View {
             .frame(width: 44, height: 44)
             .contentShape(.rect)
             .sensoryFeedback(.success, trigger: isReady)
+            .accessibilityInputLabels(["下载", "取包"])
     }
 
     @ViewBuilder

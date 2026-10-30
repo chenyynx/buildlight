@@ -24,7 +24,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     if let login = environment.session.user?.login {
                         Text("已连接 \(login)")
-                            .font(.system(size: 12.5))
+                            .scaledFont(size: 12.5)
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, DS.pad)
                             .padding(.bottom, 4)
@@ -105,7 +105,7 @@ struct SettingsView: View {
                             glyph("bell.badge.fill", tint: StatusTone.failed)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("构建结束提醒")
-                                    .font(.system(size: 15))
+                                    .scaledFont(size: 15)
                                 if !notificationAuthorized {
                                     Text("系统未授权，收不到任何提醒")
                                         .font(Type.caption)
@@ -166,7 +166,7 @@ struct SettingsView: View {
                     }
 
                     Text("BuildLight · 只盯 iPhone 上用得到的那些构建")
-                        .font(.system(size: 11))
+                        .scaledFont(size: 11)
                         .foregroundStyle(.quaternary)
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.top, 26)
@@ -211,16 +211,16 @@ struct SettingsView: View {
     private var motionRow: some View {
         HStack(spacing: 12) {
             Image(systemName: "waveform.path")
-                .font(.system(size: 13, weight: .semibold))
+                .scaledFont(size: 13, weight: .semibold)
                 .foregroundStyle(.white)
                 .frame(width: 26, height: 26)
                 .background(accent.primary, in: .rect(cornerRadius: 7))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("减弱动效")
-                    .font(.system(size: 15))
+                    .scaledFont(size: 15)
                 Text("关掉循环动画和入场位移")
-                    .font(.system(size: 11))
+                    .scaledFont(size: 11)
                     .foregroundStyle(.tertiary)
             }
 
@@ -245,7 +245,7 @@ struct SettingsView: View {
 
     private func glyph(_ name: String, tint: Color) -> some View {
         Image(systemName: name)
-            .font(.system(size: 13, weight: .semibold))
+            .scaledFont(size: 13, weight: .semibold)
             .foregroundStyle(.white)
             .frame(width: 26, height: 26)
             .background(tint, in: .rect(cornerRadius: 7))

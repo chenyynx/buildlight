@@ -23,7 +23,7 @@ struct AccentThemePicker: View {
             }
 
             Text("强调色同时用于「进行中」的呼吸点、计时和进度光带。失败和可安装始终用系统红 / 绿。")
-                .font(.system(size: 11.5))
+                .scaledFont(size: 11.5)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -48,7 +48,7 @@ struct AccentThemePicker: View {
 
                 if isSelected {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 12, weight: .black))
+                        .scaledFont(size: 12, weight: .black)
                         .foregroundStyle(.white)
                 }
             }

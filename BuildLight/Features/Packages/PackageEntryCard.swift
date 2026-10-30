@@ -13,7 +13,7 @@ struct PackageEntryCard: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "app.badge.fill")
-                        .font(.system(size: 15, weight: .semibold))
+                        .scaledFont(size: 15, weight: .semibold)
                         .foregroundStyle(.white)
                         .frame(width: 34, height: 34)
                         .background(accent.gradient, in: .rect(cornerRadius: 10))
@@ -22,10 +22,10 @@ struct PackageEntryCard: View {
                         // 显示真实文件名：签名工具里看到的就是它，
                         // 两边一致才认得出来。
                         Text(entry.fileName)
-                            .font(.system(size: 15, weight: .semibold))
+                            .scaledFont(size: 15, weight: .semibold)
                             .lineLimit(1)
                         Text(detail)
-                            .font(.system(size: 12))
+                            .scaledFont(size: 12)
                             .foregroundStyle(.secondary)
                             .monospacedDigit()
                             .lineLimit(1)
@@ -37,7 +37,7 @@ struct PackageEntryCard: View {
                 HStack(spacing: 8) {
                     ShareLink(item: fileURL) {
                         Label("导入到签名工具", systemImage: "square.and.arrow.up")
-                            .font(.system(size: 14, weight: .semibold))
+                            .scaledFont(size: 14, weight: .semibold)
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
                             .frame(height: 42)
@@ -49,7 +49,7 @@ struct PackageEntryCard: View {
                         environment.cache.remove(entry.id)
                     }
                     .labelStyle(.iconOnly)
-                    .font(.system(size: 14, weight: .semibold))
+                    .scaledFont(size: 14, weight: .semibold)
                     .foregroundStyle(StatusTone.failed)
                     .frame(width: 42, height: 42)
                     .background(StatusTone.failed.opacity(0.12), in: .rect(cornerRadius: 12))

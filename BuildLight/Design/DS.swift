@@ -64,12 +64,12 @@ struct ScreenHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(title)
-                .font(.system(size: 26, weight: .bold))
+                .scaledFont(size: 26, weight: .bold)
                 .tracking(-0.6)
                 .lineLimit(2)
             if let subtitle, !subtitle.isEmpty {
                 Text(subtitle)
-                    .font(.system(size: 12.5))
+                    .scaledFont(size: 12.5)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
             }
@@ -87,15 +87,20 @@ struct MetricCell: View {
     var tint: Color?
     var size: CGFloat = 24
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(value)
-                .font(.system(size: size, weight: .semibold).monospacedDigit())
+                .font(.system(
+                    size: size * Type.scaleFactor(for: dynamicTypeSize),
+                    weight: .semibold
+                ).monospacedDigit())
                 .foregroundStyle(tint ?? .primary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             Text(label)
-                .font(.system(size: 11))
+                .scaledFont(size: 11)
                 .foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -126,10 +131,10 @@ struct PrimaryButton: View {
             HStack(spacing: 6) {
                 if let systemImage {
                     Image(systemName: systemImage)
-                        .font(.system(size: 13, weight: .semibold))
+                        .scaledFont(size: 13, weight: .semibold)
                 }
                 Text(title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .scaledFont(size: 15, weight: .semibold)
             }
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
@@ -151,26 +156,26 @@ struct FunctionRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: systemImage)
-                .font(.system(size: 13, weight: .semibold))
+                .scaledFont(size: 13, weight: .semibold)
                 .foregroundStyle(.white)
                 .frame(width: 26, height: 26)
                 .background(tint, in: .rect(cornerRadius: 7))
 
             Text(title)
-                .font(.system(size: 15))
+                .scaledFont(size: 15)
                 .foregroundStyle(.primary)
 
             Spacer(minLength: 8)
 
             if let value {
                 Text(value)
-                    .font(.system(size: 14))
+                    .scaledFont(size: 14)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
             if showsChevron {
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
+                    .scaledFont(size: 12, weight: .semibold)
                     .foregroundStyle(.quaternary)
             }
         }

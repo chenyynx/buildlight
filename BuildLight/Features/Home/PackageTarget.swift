@@ -43,10 +43,18 @@ struct PackageTarget: Hashable {
         if !repoName.isEmpty { parts.append(repoName) }
         if runNumber > 0 { parts.append("#\(runNumber)") }
         if !branch.isEmpty { parts.append(branch) }
-        if parts.isEmpty { parts.append(name) }
+        if parts.isEmpty {
+            // 产物名本身可能就叫 xxx.ipa，先剥掉后缀再拼，
+            // 否则会变成 xxx.ipa.ipa。
+            parts.append(Self.strippingIPAExtension(name))
+        }
 
         let base = parts.joined(separator: "-")
         return Self.sanitize(base) + ".ipa"
+    }
+
+    private static func strippingIPAExtension(_ name: String) -> String {
+        name.lowercased().hasSuffix(".ipa") ? String(name.dropLast(4)) : name
     }
 
     /// 去掉文件名里非法或容易出问题的字符（分支名常带 `/`）。

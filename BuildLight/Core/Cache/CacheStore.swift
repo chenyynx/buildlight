@@ -16,6 +16,12 @@ final class CacheStore {
 
     private(set) var entries: [Entry] = []
 
+    /// 缓存上限。超过先删最旧的，再删到阈值以下。
+    /// 之前没有上限，59 MB 的包装几次就上百 MB，只能手动清。
+    private let maxTotalBytes: Int64 = 2 * 1024 * 1024 * 1024
+    /// 淘汰目标：清到上限的 80%，避免刚删完又超。
+    private let evictTargetBytes: Int64 = 1_600 * 1024 * 1024
+
     private let directory: URL
     private let indexURL: URL
 
@@ -70,6 +76,7 @@ final class CacheStore {
             Entry(id: id, name: name, fileName: fileName, size: size, savedAt: .now),
             at: 0
         )
+        evictIfNeeded()
         persist()
         return destination
     }
@@ -91,6 +98,18 @@ final class CacheStore {
         entries = []
         persist()
         return freed
+    }
+
+    /// 超限时按「最久未下载」淘汰。
+    private func evictIfNeeded() {
+        guard totalSize > maxTotalBytes else { return }
+        // 新插入的在最前，从尾部（最旧）开始删
+        while totalSize > evictTargetBytes, let oldest = entries.last {
+            entries.removeLast()
+            try? FileManager.default.removeItem(
+                at: directory.appendingPathComponent(oldest.fileName)
+            )
+        }
     }
 
     // MARK: 持久化

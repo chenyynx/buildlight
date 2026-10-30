@@ -90,7 +90,7 @@ struct HistoryRepoSection: View {
                 PulsingDot(color: accent.primary, size: 5)
             } else if latest.map(isFailed) == true {
                 Image(systemName: "xmark")
-                    .font(.system(size: 8, weight: .black))
+                    .scaledFont(size: 8, weight: .black)
                     .foregroundStyle(.white)
                     .frame(width: 14, height: 14)
                     .background(StatusTone.failed, in: .circle)

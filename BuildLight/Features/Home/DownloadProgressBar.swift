@@ -59,7 +59,7 @@ struct DownloadRing: View {
                     .foregroundStyle(accent.primary)
             } else {
                 Text("\(Int(clamped * 100))")
-                    .font(.system(size: 9, weight: .semibold))
+                    .scaledFont(size: 9, weight: .semibold)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
             }

@@ -14,14 +14,15 @@ struct StepRow: View {
             glyph
 
             Text(step.name)
-                .font(.system(size: 14))
+                .scaledFont(size: 14)
                 .foregroundStyle(step.status == .queued ? .tertiary : .primary)
                 .lineLimit(1)
 
             Spacer(minLength: 8)
 
             Text(duration)
-                .font(.system(size: 12).monospacedDigit())
+                .scaledFont(size: 12)
+                .monospacedDigit()
                 .foregroundStyle(.tertiary)
         }
         .padding(.leading, DS.pad + 14)
@@ -37,7 +38,7 @@ struct StepRow: View {
         case .completed:
             if isFailed {
                 Image(systemName: "xmark")
-                    .font(.system(size: 8, weight: .black))
+                    .scaledFont(size: 8, weight: .black)
                     .foregroundStyle(.white)
                     .frame(width: 14, height: 14)
                     .background(StatusTone.failed, in: .circle)

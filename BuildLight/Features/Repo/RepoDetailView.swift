@@ -61,7 +61,7 @@ struct RepoDetailView: View {
                             Button("重跑", systemImage: "arrow.clockwise") {
                                 pendingAction = .rerun(run)
                             }
-                            .tint(StatusTone.running)
+                            .tint(accent.primary)
                         }
                     }
                 }
@@ -181,25 +181,25 @@ struct RepoDetailView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "shippingbox.fill")
-                        .font(.system(size: 14, weight: .semibold))
+                        .scaledFont(size: 14, weight: .semibold)
                         .foregroundStyle(accent.primary)
                         .padding(.top, 2)
 
                     VStack(alignment: .leading, spacing: 3) {
                         Text(target.name)
-                            .font(.system(size: 15, weight: .semibold))
+                            .scaledFont(size: 15, weight: .semibold)
                             .lineLimit(1)
 
                         // 一眼看出这个包是哪次构建、哪条分支出来的。
                         // 之前只有文件名和大小，取错包还得回列表比对。
                         Text(buildLine)
-                            .font(.system(size: 12))
+                            .scaledFont(size: 12)
                             .foregroundStyle(.secondary)
                             .monospacedDigit()
                             .lineLimit(1)
 
                         Text(packageDetail(target))
-                            .font(.system(size: 12))
+                            .scaledFont(size: 12)
                             .foregroundStyle(.tertiary)
                             .monospacedDigit()
                             .lineLimit(1)
@@ -270,9 +270,9 @@ struct RepoDetailView: View {
             ShareLink(item: url) {
                 HStack(spacing: 6) {
                     Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 13, weight: .semibold))
+                        .scaledFont(size: 13, weight: .semibold)
                     Text("导入到全能签")
-                        .font(.system(size: 15, weight: .semibold))
+                        .scaledFont(size: 15, weight: .semibold)
                 }
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
@@ -283,7 +283,7 @@ struct RepoDetailView: View {
         case .failed(let error):
             VStack(alignment: .leading, spacing: 8) {
                 Text(error.localizedDescription)
-                    .font(.system(size: 12))
+                    .scaledFont(size: 12)
                     .foregroundStyle(StatusTone.failed)
                 PrimaryButton(title: "重试", systemImage: "arrow.clockwise", tint: StatusTone.failed) {
                     environment.packages.start(target)

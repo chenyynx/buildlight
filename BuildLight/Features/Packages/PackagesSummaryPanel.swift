@@ -11,16 +11,16 @@ struct PackagesSummaryPanel: View {
         GlassSurface(level: .panel, cornerRadius: Metrics.radiusXL) {
             HStack(alignment: .center, spacing: 14) {
                 Image(systemName: "shippingbox.fill")
-                    .font(.system(size: 22, weight: .semibold))
+                    .scaledFont(size: 22, weight: .semibold)
                     .foregroundStyle(.white)
                     .frame(width: 46, height: 46)
                     .background(accent.gradient, in: .rect(cornerRadius: 14))
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(count > 0 ? "\(count) 个安装包" : "还没有包")
-                        .font(.system(size: 17, weight: .semibold))
+                        .scaledFont(size: 17, weight: .semibold)
                     Text("占用 \(totalSize)")
-                        .font(.system(size: 12.5))
+                        .scaledFont(size: 12.5)
                         .foregroundStyle(.secondary)
                 }
 

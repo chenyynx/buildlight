@@ -50,6 +50,11 @@ struct RepoCard: View {
             }
         }
         .clipShape(.rect(cornerRadius: Metrics.radiusL))
+        // 整卡作为一个元素朗读：分开读会把「名字 / 分支 / 耗时 / 大小」
+        // 拆成四次滑动，扫读成本翻倍。
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityText)
+        .accessibilityHint(repo.hasPackage ? "轻点查看构建记录，长按可重跑或隐藏" : "轻点查看构建记录")
     }
 
     // MARK: 主行
@@ -210,7 +215,7 @@ struct StatusGlyph: View {
                 PulsingDot(color: accent.primary, size: 6)
             } else if repo.latestFailed {
                 Image(systemName: "xmark")
-                    .font(.system(size: 9, weight: .black))
+                    .scaledFont(size: 9, weight: .black)
                     .foregroundStyle(.white)
                     .frame(width: 16, height: 16)
                     .background(StatusTone.failed, in: .circle)

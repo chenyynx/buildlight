@@ -14,11 +14,14 @@ struct BuildLightApp: App {
             // 本地库打不开时退化到内存，至少让 App 可用（数据不落盘）。
             container = try! PersistenceStack.makeContainer(inMemory: true)
         }
-        _environment = State(initialValue: AppEnvironment(container: container))
+        let environment = AppEnvironment(container: container)
+        _environment = State(initialValue: environment)
 
         // 必须在这里挂：从通知冷启动时，系统会在 Scene 建立前投递 response。
         // 放到 .task 里就晚了，点击会被丢掉。
         UNUserNotificationCenter.current().delegate = NotificationDelegate.shared
+        // 后台任务必须在启动完成前注册，晚了系统会抛异常。
+        BackgroundRefresh.shared.register(environment: environment)
     }
 
     var body: some Scene {
@@ -59,10 +62,14 @@ struct RootView: View {
             // 不在这里补一次，第一次打开根本不会开始轮询。
             guard environment.session.isSignedIn else { return }
             environment.monitor.start()
+            BackgroundRefresh.shared.schedule()
             await environment.monitor.refreshAll()
         }
         .onChange(of: scenePhase) { _, phase in
-            guard phase == .active, environment.session.isSignedIn else { return }
+            guard phase == .active, environment.session.isSignedIn else {
+                if phase == .background { BackgroundRefresh.shared.schedule() }
+                return
+            }
             environment.monitor.start()
             // 回前台立刻全量刷一遍：挂起期间数据是旧的，
             // 用户第一眼看到的必须是真实状态，而不是几秒前的快照。

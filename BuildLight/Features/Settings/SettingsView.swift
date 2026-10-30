@@ -18,7 +18,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     ScreenHeader(
                         title: "设置",
-                        subtitle: environment.session.user?.login.map { "已连接 \($0)" } ?? "已连接"
+                        subtitle: loginSubtitle
                     )
 
                     SectionLabel("账号")
@@ -162,6 +162,13 @@ struct SettingsView: View {
             .foregroundStyle(.white)
             .frame(width: 26, height: 26)
             .background(tint, in: .rect(cornerRadius: 7))
+    }
+
+    private var loginSubtitle: String {
+        if let login = environment.session.user?.login {
+            return "已连接 \(login)"
+        }
+        return "已连接"
     }
 
     private var visibleCount: Int {

@@ -15,6 +15,8 @@ enum AppError: LocalizedError, Equatable, Sendable {
     case server(status: Int)
     /// 数据格式不符合预期：属于 App 的问题，需要上报。
     case decoding(String)
+    /// 请求被取消（切后台、刷新覆盖）。界面上不应显示为错误。
+    case cancelled
     /// 产物已过期或不存在。
     case artifactUnavailable
     /// 解压后没有找到 .ipa。
@@ -25,6 +27,7 @@ enum AppError: LocalizedError, Equatable, Sendable {
     var errorDescription: String? {
         switch self {
         case .unauthorized: return "登录已失效，请重新填写 Token"
+        case .cancelled: return "请求已取消"
         case .notFound: return "仓库不存在，或这个 Token 没有访问权限"
         case .rateLimited(let reset):
             guard let reset else { return "GitHub 接口调用超限" }
@@ -41,7 +44,7 @@ enum AppError: LocalizedError, Equatable, Sendable {
     /// 是否值得自动重试。
     var isRetryable: Bool {
         switch self {
-        case .offline, .server: return true
+        case .offline, .server, .cancelled: return true
         case .rateLimited: return false
         case .unauthorized, .notFound, .decoding: return false
         case .artifactUnavailable, .packageMissing, .archiveInvalid: return false
@@ -50,6 +53,10 @@ enum AppError: LocalizedError, Equatable, Sendable {
 
     static func map(_ error: Error) -> AppError {
         if let app = error as? AppError { return app }
+        // 任务被取消（切后台、主动刷新覆盖）不是网络故障，
+        // 之前会被归成 .offline，于是界面挂着「网络不可用」但其实一切正常。
+        if error is CancellationError { return .cancelled }
+        if let url = error as? URLError, url.code == .cancelled { return .cancelled }
         if let gh = error as? GitHubError {
             switch gh {
             case .unauthorized: return .unauthorized

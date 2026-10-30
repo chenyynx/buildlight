@@ -70,7 +70,7 @@ final class PackageService {
                 let zipURL = try await self.download(request, target: target)
 
                 self.states[target.id] = .unzipping
-                let stored = try self.finalize(zipURL: zipURL, id: target.id)
+                let stored = try self.finalize(zipURL: zipURL, target: target)
                 self.states[target.id] = .ready(stored)
             } catch is CancellationError {
                 // 暂停：保留已下载的字节，状态回到 paused
@@ -139,7 +139,8 @@ final class PackageService {
 
     // MARK: 内部
 
-    private func finalize(zipURL: URL, id: Int) throws -> URL {
+    private func finalize(zipURL: URL, target: PackageTarget) throws -> URL {
+        let id = target.id
         defer { try? FileManager.default.removeItem(at: zipURL) }
 
         let destination = FileManager.default.temporaryDirectory
@@ -152,7 +153,12 @@ final class PackageService {
         guard let ipa = Self.firstIPA(in: destination) else {
             throw AppError.packageMissing
         }
-        return try cache.save(fileURL: ipa, id: id, name: ipa.lastPathComponent)
+        return try cache.save(
+            fileURL: ipa,
+            id: id,
+            name: target.name,
+            fileName: target.friendlyFileName
+        )
     }
 
     nonisolated private static func firstIPA(in directory: URL) -> URL? {

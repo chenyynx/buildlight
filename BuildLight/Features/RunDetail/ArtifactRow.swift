@@ -47,7 +47,11 @@ struct ArtifactRow: View {
                     target: PackageTarget(
                         id: artifact.id,
                         name: artifact.name,
-                        archiveURL: artifact.downloadURL
+                        archiveURL: artifact.downloadURL,
+                        repoName: artifact.run?.repo?.name ?? "",
+                        runNumber: artifact.run?.number ?? 0,
+                        branch: artifact.run?.branch ?? "",
+                        workflowName: artifact.run?.workflowName ?? ""
                     ),
                     compact: true
                 )

@@ -11,7 +11,23 @@ final class BuildMonitor {
     private let session: GitHubSession
 
     private var nextPollAt: [String: Date] = [:]
-    private(set) var errors: [String: AppError] = [:]
+    /// 每个仓库「最近一次失败」+「最近一次成功」，用来判断这个错误是不是过期了。
+    ///
+    /// 之前是整个字典只增不减：某个仓库偶发一次超时，之后全跑通了，
+    /// 那条错误还挂着，顶部就永远显示「网络不可用」。
+    private var lastFailure: [String: (error: AppError, at: Date)] = [:]
+    private var lastSuccess: [String: Date] = [:]
+
+    /// 只暴露「至今仍然成立」的错误：
+    /// 该仓库最近一次成功如果不晚于最近一次失败，这条错误就已经过期，不再显示。
+    var errors: [String: AppError] {
+        var result: [String: AppError] = [:]
+        for (key, failure) in lastFailure {
+            if let success = lastSuccess[key], success > failure.at { continue }
+            result[key] = failure.error
+        }
+        return result
+    }
     private(set) var isRefreshing = false
     private(set) var lastRefreshAt: Date?
     private var pausedUntil: Date?
@@ -58,6 +74,11 @@ final class BuildMonitor {
             FetchDescriptor<RepoRecord>(sortBy: [SortDescriptor(\.sortIndex)])
         )) ?? []
 
+        // 仓库被删掉或隐藏后，它的错误记录不应该继续挂在界面上。
+        let alive = Set(all.filter { !$0.isHidden }.map(\.fullName))
+        lastFailure = lastFailure.filter { alive.contains($0.key) }
+        lastSuccess = lastSuccess.filter { alive.contains($0.key) }
+
         let now = Date()
         let due = all
             .filter { !$0.isHidden }
@@ -86,7 +107,7 @@ final class BuildMonitor {
 
     func refreshNow() async {
         nextPollAt.removeAll()
-        await tick()
+        await refreshAll()
     }
 
     /// 回到前台时用：把所有仓库都刷一遍，而不是每轮只刷 6 个。
@@ -108,7 +129,8 @@ final class BuildMonitor {
         do {
             let runs = try await client.runs(owner: repo.owner, repo: repo.name, perPage: historyLimit)
             apply(runs: runs, to: repo)
-            errors[repo.fullName] = nil
+            lastSuccess[repo.fullName] = .now
+            lastFailure[repo.fullName] = nil
 
             let hasActive = runs.contains(where: \.isActive)
             repo.hasWorkflows = !runs.isEmpty
@@ -122,7 +144,12 @@ final class BuildMonitor {
             await loadArtifacts(for: Array(runs.prefix(2)), repo: repo, client: client)
         } catch {
             let mapped = AppError.map(error)
-            errors[repo.fullName] = mapped
+            // 取消不算失败：切后台、切主题触发的重刷都会取消在途请求。
+            guard mapped != .cancelled else {
+                nextPollAt[repo.fullName] = Date().addingTimeInterval(2)
+                return
+            }
+            lastFailure[repo.fullName] = (mapped, .now)
 
             switch mapped {
             case .rateLimited(let resetAt):

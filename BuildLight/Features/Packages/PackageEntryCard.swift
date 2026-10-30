@@ -19,7 +19,9 @@ struct PackageEntryCard: View {
                         .background(accent.gradient, in: .rect(cornerRadius: 10))
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(entry.name)
+                        // 显示真实文件名：签名工具里看到的就是它，
+                        // 两边一致才认得出来。
+                        Text(entry.fileName)
                             .font(.system(size: 15, weight: .semibold))
                             .lineLimit(1)
                         Text(detail)
@@ -52,7 +54,7 @@ struct PackageEntryCard: View {
                     .frame(width: 42, height: 42)
                     .background(StatusTone.failed.opacity(0.12), in: .rect(cornerRadius: 12))
                     .buttonStyle(PressableStyle())
-                    .accessibilityLabel("删除 \(entry.name)")
+                    .accessibilityLabel("删除 \(entry.fileName)")
                 }
             }
             .padding(14)

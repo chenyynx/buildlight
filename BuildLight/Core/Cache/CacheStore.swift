@@ -43,8 +43,21 @@ final class CacheStore {
     }
 
     /// 把解压出来的 ipa 收进缓存，返回最终路径。
-    func save(fileURL: URL, id: Int, name: String) throws -> URL {
-        let fileName = "\(id)-\(name)"
+    ///
+    /// `fileName` 用可读名（仓库-构建号-分支），不再拼 artifact id——
+    /// 那个 id 会在签名工具的列表里变成一长串数字，没法区分。
+    /// 重名时在末尾补 `-2`、`-3`，不覆盖已有的包。
+    func save(fileURL: URL, id: Int, name: String, fileName preferred: String? = nil) throws -> URL {
+        let base = preferred ?? name
+        var fileName = base
+        var counter = 2
+        while FileManager.default.fileExists(atPath: directory.appendingPathComponent(fileName).path),
+              entries.first(where: { $0.fileName == fileName && $0.id != id }) != nil {
+            let stem = (base as NSString).deletingPathExtension
+            let ext = (base as NSString).pathExtension
+            fileName = ext.isEmpty ? "\(stem)-\(counter)" : "\(stem)-\(counter).\(ext)"
+            counter += 1
+        }
         let destination = directory.appendingPathComponent(fileName)
         if FileManager.default.fileExists(atPath: destination.path) {
             try FileManager.default.removeItem(at: destination)

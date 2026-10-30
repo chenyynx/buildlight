@@ -130,7 +130,15 @@ struct RepoDetailView: View {
               let name = repo.packageName,
               let url = repo.packageURL
         else { return nil }
-        return PackageTarget(id: id, name: name, archiveURL: url)
+        return PackageTarget(
+            id: id,
+            name: name,
+            archiveURL: url,
+            repoName: repo.name,
+            runNumber: repo.latestNumber,
+            branch: repo.latestBranch ?? "",
+            workflowName: repo.latestWorkflowName ?? ""
+        )
     }
 
     private func packageBlock(_ target: PackageTarget) -> some View {

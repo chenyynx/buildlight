@@ -63,7 +63,7 @@ struct CacheView: View {
 
     private func row(_ entry: CacheStore.Entry) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(entry.name)
+            Text(entry.fileName)
                 .font(.subheadline)
                 .lineLimit(1)
             Text("\(ByteCountFormatter.string(fromByteCount: entry.size, countStyle: .file)) · \(entry.savedAt.formatted(.relative(presentation: .named)))")

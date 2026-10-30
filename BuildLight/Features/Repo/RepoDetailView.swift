@@ -4,6 +4,7 @@ import SwiftData
 struct RepoDetailView: View {
     @Environment(AppEnvironment.self) private var environment
     @Query private var runs: [RunRecord]
+    @Environment(\.openURL) private var openURL
 
     private let repo: RepoRecord
 
@@ -18,44 +19,56 @@ struct RepoDetailView: View {
 
     var body: some View {
         List {
+            header
+                .listRowInsets(EdgeInsets())
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+
             if let target = latestPackage {
-                Section {
-                    latestPackageRow(target)
-                } header: {
-                    Text("最新产物")
-                } footer: {
-                    Text(packageFooter)
-                }
+                packageBlock(target)
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
             }
 
-            ForEach(filteredRuns) { run in
-                NavigationLink(value: RunRoute(runID: run.id)) {
-                    RunRow(run: run)
-                }
-                .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                    if run.isActive {
-                        Button("取消", systemImage: "xmark", role: .destructive) {
-                            cancel(run)
+            Section {
+                ForEach(filteredRuns) { run in
+                    ZStack(alignment: .bottom) {
+                        NavigationLink(value: RunRoute(runID: run.id)) {
+                            RunRowView(run: run)
                         }
-                    } else {
-                        Button("重跑", systemImage: "arrow.clockwise") {
-                            rerun(run)
+                        .buttonStyle(PressableStyle())
+
+                        Hairline(leading: DS.pad + 18)
+                    }
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                        if run.isActive {
+                            Button("取消", systemImage: "xmark", role: .destructive) { cancel(run) }
+                        } else {
+                            Button("重跑", systemImage: "arrow.clockwise") { rerun(run) }
+                                .tint(StatusTone.running)
                         }
-                        .tint(.orange)
                     }
                 }
+            } header: {
+                SectionLabel("构建记录")
+                    .listRowInsets(EdgeInsets())
             }
         }
-        .listStyle(.insetGrouped)
+        .listStyle(.plain)
+        .scrollIndicators(.hidden)
+        .background(PaperBackground())
+        .navigationBarTitleDisplayMode(.inline)
         .navigationTitle(repo.displayName)
         .navigationDestination(for: RunRoute.self) { route in
             if let run = filteredRuns.first(where: { $0.id == route.runID }) {
                 RunDetailView(run: run)
             }
         }
-        .refreshable {
-            await environment.monitor.refreshNow()
-        }
+        .refreshable { await environment.monitor.refreshNow() }
         .overlay {
             if filteredRuns.isEmpty {
                 ContentUnavailableView(
@@ -67,6 +80,50 @@ struct RepoDetailView: View {
         }
     }
 
+    // MARK: 头部
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ScreenHeader(title: repo.displayName, subtitle: headerSubtitle)
+
+            HStack(spacing: 0) {
+                MetricCell(value: "\(filteredRuns.count)", label: "次构建")
+                VerticalRule()
+                MetricCell(
+                    value: "\(successCount)",
+                    label: "成功",
+                    tint: successCount > 0 ? nil : StatusTone.idle
+                )
+                VerticalRule()
+                MetricCell(
+                    value: "\(failureCount)",
+                    label: "失败",
+                    tint: failureCount > 0 ? StatusTone.failed : nil
+                )
+            }
+            .padding(.horizontal, DS.pad)
+            .padding(.bottom, 6)
+        }
+    }
+
+    private var headerSubtitle: String {
+        var parts: [String] = []
+        if let workflow = repo.workflowFilter, !workflow.isEmpty { parts.append(workflow) }
+        if let branch = repo.latestBranch, !branch.isEmpty { parts.append(branch) }
+        if let at = repo.latestRunAt { parts.append("最近 " + RelativeTime.text(for: at)) }
+        return parts.joined(separator: " · ")
+    }
+
+    private var successCount: Int {
+        filteredRuns.filter { $0.conclusion == .success }.count
+    }
+
+    private var failureCount: Int {
+        filteredRuns.filter { $0.conclusion == .failure || $0.conclusion == .timedOut }.count
+    }
+
+    // MARK: 最新产物
+
     private var latestPackage: PackageTarget? {
         guard let id = repo.packageID,
               let name = repo.packageName,
@@ -75,75 +132,101 @@ struct RepoDetailView: View {
         return PackageTarget(id: id, name: name, archiveURL: url)
     }
 
-    /// 进详情第一屏就是包，不用再往下翻。
-    private func latestPackageRow(_ target: PackageTarget) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: "shippingbox.fill")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(Accent.primary)
-                .frame(width: 36, height: 36)
-                .background(Accent.soft, in: .rect(cornerRadius: 10))
+    private func packageBlock(_ target: PackageTarget) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "shippingbox.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Accent.primary)
+                    .padding(.top, 2)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(target.name)
-                    .font(.subheadline.weight(.medium))
-                    .lineLimit(1)
-
-                switch environment.packages.state(for: target.id) {
-                case .paused(let progress):
-                    Text("已下载 \(Int(progress * 100))% · \(packageSizeText) · 点右侧继续")
-                        .font(.caption)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(target.name)
+                        .font(.system(size: 15, weight: .semibold))
+                        .lineLimit(1)
+                    Text(packageDetail(target))
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
                         .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                    DownloadProgressBar(progress: progress, height: 3)
-                        .opacity(0.55)
-                        .padding(.top, 2)
-                case .downloading(let progress):
-                    Text(downloadLine(progress: progress, artifactID: target.id))
-                        .font(.caption)
-                        .monospacedDigit()
-                        .foregroundStyle(Accent.primary)
-                    DownloadProgressBar(progress: progress, height: 3)
-                        .padding(.top, 2)
-                case .unzipping:
-                    Text("正在解压 · \(packageSizeText)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                default:
-                    Text(packageSizeText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
+                Spacer(minLength: 0)
             }
 
-            Spacer(minLength: 8)
-            PackageButton(target: target)
+            packageAction(target)
         }
-        .padding(.vertical, 2)
+        .padding(16)
+        .background(.quaternary.opacity(0.22), in: .rect(cornerRadius: 16))
+        .padding(.horizontal, DS.pad)
+        .padding(.top, 14)
     }
 
-    private func downloadLine(progress: Double, artifactID: Int) -> String {
-        var parts = ["下载中 \(Int(progress * 100))%"]
-        if let speed = environment.packages.speed(for: artifactID), let text = ByteRate.text(speed) {
-            parts.append(text)
-        }
-        parts.append(packageSizeText)
-        return parts.joined(separator: " · ")
-    }
-
-    private var packageSizeText: String {
-        repo.packageSize > 0
+    private func packageDetail(_ target: PackageTarget) -> String {
+        let size = repo.packageSize > 0
             ? ByteCountFormatter.string(fromByteCount: Int64(repo.packageSize), countStyle: .file)
-            : "点右侧下载"
+            : "—"
+
+        switch environment.packages.state(for: target.id) {
+        case .downloading(let progress):
+            var parts = ["下载中 \(Int(progress * 100))%"]
+            if let speed = environment.packages.speed(for: target.id), let text = ByteRate.text(speed) {
+                parts.append(text)
+            }
+            parts.append(size)
+            return parts.joined(separator: " · ")
+        case .paused(let progress):
+            return "已下载 \(Int(progress * 100))% · 点下面继续 · \(size)"
+        case .unzipping:
+            return "正在解压 · \(size)"
+        case .ready:
+            return "已就绪 · \(size)"
+        default:
+            return size
+        }
     }
 
-    private var packageFooter: String {
-        var parts: [String] = []
-        if let branch = repo.latestBranch, !branch.isEmpty { parts.append(branch) }
-        if repo.latestNumber > 0 { parts.append("#\(repo.latestNumber)") }
-        parts.append("构建完成后自动更新")
-        return parts.joined(separator: " · ")
+    @ViewBuilder
+    private func packageAction(_ target: PackageTarget) -> some View {
+        switch environment.packages.state(for: target.id) {
+        case .idle:
+            PrimaryButton(title: "下载并导入", systemImage: "arrow.down") {
+                environment.packages.start(target)
+            }
+        case .paused:
+            PrimaryButton(title: "继续下载", systemImage: "arrow.down") {
+                environment.packages.start(target)
+            }
+        case .downloading(let progress):
+            DownloadProgressBar(progress: progress)
+        case .unzipping:
+            DownloadProgressBar(progress: 1)
+                .opacity(0.45)
+        case .ready(let url):
+            ShareLink(item: url) {
+                HStack(spacing: 6) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("导入到全能签")
+                        .font(.system(size: 15, weight: .semibold))
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 46)
+                .background(Accent.primary, in: .rect(cornerRadius: 13))
+            }
+            .buttonStyle(PressableStyle())
+        case .failed(let error):
+            VStack(alignment: .leading, spacing: 8) {
+                Text(error.localizedDescription)
+                    .font(.system(size: 12))
+                    .foregroundStyle(StatusTone.failed)
+                PrimaryButton(title: "重试", systemImage: "arrow.clockwise", tint: StatusTone.failed) {
+                    environment.packages.start(target)
+                }
+            }
+        }
     }
+
+    // MARK: 数据
 
     private var filteredRuns: [RunRecord] {
         guard let filter = repo.workflowFilter, !filter.isEmpty else { return runs }

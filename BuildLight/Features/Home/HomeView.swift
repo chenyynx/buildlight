@@ -47,7 +47,7 @@ struct HomeView: View {
                 .padding(.bottom, Metrics.tabBarClearance)
             }
             .scrollIndicators(.hidden)
-            .background(.background)
+            .background(PaperBackground())
             .navigationTitle("构建")
             .navigationBarTitleDisplayMode(.large)
             .searchable(text: $searchText, prompt: "搜索仓库")
@@ -86,33 +86,15 @@ struct HomeView: View {
     /// 数字本身就是信息，装饰只会稀释它。
     private var statsStrip: some View {
         HStack(spacing: 0) {
-            stat(value: "\(activeCount)", label: "在跑", tint: activeCount > 0 ? StatusTone.running : nil)
-            divider
-            stat(value: "\(failingCount)", label: "失败", tint: failingCount > 0 ? StatusTone.failed : nil)
-            divider
-            stat(value: "\(visibleRepos.count)", label: "仓库", tint: nil)
+            MetricCell(value: "\(activeCount)", label: "在跑", tint: activeCount > 0 ? StatusTone.running : nil)
+            VerticalRule()
+            MetricCell(value: "\(failingCount)", label: "失败", tint: failingCount > 0 ? StatusTone.failed : nil)
+            VerticalRule()
+            MetricCell(value: "\(visibleRepos.count)", label: "仓库")
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, DS.pad)
         .padding(.top, 4)
-        .padding(.bottom, 12)
-    }
-
-    private func stat(value: String, label: String, tint: Color?) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(value)
-                .font(.system(size: 24, weight: .semibold).monospacedDigit())
-                .foregroundStyle(tint ?? .primary)
-            Text(label)
-                .font(.system(size: 11))
-                .foregroundStyle(.tertiary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var divider: some View {
-        Rectangle()
-            .fill(.quaternary.opacity(0.6))
-            .frame(width: 0.5, height: 28)
+        .padding(.bottom, 10)
     }
 
     /// 让人知道数据是活的。没有这行，一个不动的数字很容易被当成卡死。
@@ -121,7 +103,7 @@ struct HomeView: View {
             Text(freshness(context.date))
                 .font(.system(size: 11))
                 .foregroundStyle(.quaternary)
-                .padding(.horizontal, 20)
+                .padding(.horizontal, DS.pad)
                 .padding(.bottom, 10)
         }
     }
@@ -142,7 +124,7 @@ struct HomeView: View {
             }
         }
         .pickerStyle(.segmented)
-        .padding(.horizontal, 20)
+        .padding(.horizontal, DS.pad)
         .padding(.bottom, 14)
     }
 
@@ -186,23 +168,5 @@ struct HomeView: View {
         defer { isSyncing = false }
         try? await environment.repos.syncAll()
         await environment.monitor.refreshNow()
-    }
-}
-
-/// 分组标题：小、宽字距、灰。不画横线，靠留白分组。
-struct SectionLabel: View {
-    let title: String
-
-    init(_ title: String) { self.title = title }
-
-    var body: some View {
-        Text(title)
-            .font(.system(size: 11, weight: .semibold))
-            .tracking(1.2)
-            .foregroundStyle(.tertiary)
-            .padding(.horizontal, 20)
-            .padding(.top, 18)
-            .padding(.bottom, 6)
-            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

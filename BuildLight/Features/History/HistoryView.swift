@@ -8,10 +8,40 @@ struct HistoryView: View {
         NavigationStack {
             List {
                 ForEach(groups) { group in
-                    HistoryRepoGroupView(group: group)
+                    Section {
+                        ForEach(group.runs) { run in
+                            ZStack(alignment: .bottom) {
+                                NavigationLink(value: RunRoute(runID: run.id)) {
+                                    RunRowView(run: run)
+                                }
+                                .buttonStyle(PressableStyle())
+                                Hairline(leading: DS.pad)
+                            }
+                            .listRowInsets(EdgeInsets())
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                        }
+                    } header: {
+                        HStack {
+                            Text(group.repoFullName)
+                                .font(.system(size: 11, weight: .semibold))
+                                .tracking(1.1)
+                                .foregroundStyle(.tertiary)
+                            Spacer()
+                            Text("\(group.runs.count)")
+                                .font(.system(size: 11).monospacedDigit())
+                                .foregroundStyle(.quaternary)
+                        }
+                        .padding(.horizontal, DS.pad)
+                        .padding(.top, 18)
+                        .padding(.bottom, 4)
+                        .textCase(nil)
+                    }
                 }
             }
-            .listStyle(.insetGrouped)
+            .listStyle(.plain)
+            .scrollIndicators(.hidden)
+            .background(PaperBackground())
             .navigationTitle("历史")
             .navigationDestination(for: RunRoute.self) { route in
                 if let run = runs.first(where: { $0.id == route.runID }) {

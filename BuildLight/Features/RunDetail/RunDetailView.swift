@@ -10,72 +10,41 @@ struct RunDetailView: View {
     @State private var isLoading = false
 
     var body: some View {
-        List {
-            if let loadError {
-                Section {
-                    Label(loadError.localizedDescription, systemImage: "exclamationmark.triangle")
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                }
-            }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                header
+                metaBlock
 
-            Section {
-                LabeledContent("状态") {
-                    Label(statusText, systemImage: statusSymbol)
-                        .foregroundStyle(statusColor)
+                if let loadError {
+                    Text(loadError.localizedDescription)
+                        .font(.system(size: 12))
+                        .foregroundStyle(StatusTone.failed)
+                        .padding(.horizontal, DS.pad)
+                        .padding(.top, 10)
                 }
-                LabeledContent("分支", value: run.branch ?? "—")
-                LabeledContent("提交", value: String(run.sha.prefix(7)))
-                if let actor = run.actorLogin {
-                    LabeledContent("触发人", value: actor)
-                }
-                if let started = run.startedAt {
-                    TimelineView(.periodic(from: started, by: 1)) { _ in
-                        LabeledContent("耗时", value: elapsedText)
-                    }
-                } else {
-                    LabeledContent("耗时", value: "排队中")
-                }
-            }
 
-            ForEach(jobs) { job in
-                Section {
+                ForEach(jobs) { job in
+                    SectionLabel(job.name)
                     ForEach(job.steps) { step in
                         StepRow(step: step)
                     }
-                } header: {
-                    HStack {
-                        Text(job.name)
-                        Spacer()
-                        Text(jobDuration(job))
-                            .monospacedDigit()
-                    }
+                    Hairline(leading: DS.pad)
                 }
-            }
 
-            if !sortedArtifacts.isEmpty {
-                Section("安装包") {
+                if !sortedArtifacts.isEmpty {
+                    SectionLabel("安装包")
                     ForEach(sortedArtifacts) { artifact in
                         ArtifactRow(artifact: artifact)
                     }
                 }
-            }
 
-            Section {
-                Button("重新运行", systemImage: "arrow.clockwise") {
-                    rerun()
-                }
-                if run.isActive {
-                    Button("取消运行", systemImage: "xmark", role: .destructive) {
-                        cancel()
-                    }
-                }
-                Link(destination: run.htmlURL) {
-                    Label("在浏览器中打开", systemImage: "safari")
-                }
+                actions
+                    .padding(.top, 28)
             }
+            .padding(.bottom, 40)
         }
-        .listStyle(.insetGrouped)
+        .scrollIndicators(.hidden)
+        .background(PaperBackground())
         .navigationTitle("#\(run.number)")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
@@ -83,9 +52,106 @@ struct RunDetailView: View {
         .refreshable { await load() }
     }
 
+    // MARK: 头部
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Circle().fill(tone).frame(width: 6, height: 6)
+                Text(statusText)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(tone)
+                Spacer()
+                Text(run.event)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+            }
+
+            Text(run.title ?? run.workflowName ?? "#\(run.number)")
+                .font(.system(size: 21, weight: .semibold))
+                .tracking(-0.3)
+                .lineLimit(3)
+                .padding(.top, 2)
+
+            if run.isActive {
+                TimelineView(.periodic(from: run.startedAt ?? run.createdAt, by: 1)) { context in
+                    durationLine(now: context.date)
+                }
+            } else {
+                durationLine(now: run.updatedAt)
+            }
+        }
+        .padding(.horizontal, DS.pad)
+        .padding(.top, 8)
+    }
+
+    private func durationLine(now: Date) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(elapsed(now: now))
+                .font(.system(size: 34, weight: .semibold).monospacedDigit())
+                .foregroundStyle(run.isActive ? StatusTone.running : .primary)
+            Text(run.isActive ? (run.startedAt == nil ? "排队中" : "进行中") : "总耗时")
+                .font(.system(size: 11))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.top, 4)
+    }
+
+    private var metaBlock: some View {
+        VStack(spacing: 0) {
+            metaRow("分支", run.branch ?? "—")
+            metaRow("提交", String(run.sha.prefix(7)))
+            if let actor = run.actorLogin {
+                metaRow("触发人", actor)
+            }
+            metaRow("开始", run.startedAt.map { $0.formatted(date: .abbreviated, time: .shortened) } ?? "排队中")
+        }
+        .padding(.top, 18)
+    }
+
+    private func metaRow(_ label: String, _ value: String) -> some View {
+        HStack {
+            Text(label)
+                .font(.system(size: 12))
+                .foregroundStyle(.tertiary)
+                .frame(width: 52, alignment: .leading)
+            Text(value)
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, DS.pad)
+        .padding(.vertical, 5)
+    }
+
+    // MARK: 操作
+
+    private var actions: some View {
+        VStack(spacing: 8) {
+            PrimaryButton(title: "重新运行", systemImage: "arrow.clockwise") {
+                rerun()
+            }
+
+            if run.isActive {
+                PrimaryButton(title: "取消运行", systemImage: "xmark", tint: StatusTone.failed) {
+                    cancel()
+                }
+            }
+
+            Link(destination: run.htmlURL) {
+                Text("在浏览器中打开")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Accent.primary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 40)
+            }
+        }
+        .padding(.horizontal, DS.pad)
+    }
+
     // MARK: 计算
 
-    /// 只列安装包。日志、覆盖率之类的产物在这个 App 里没有使用场景。
     private var sortedArtifacts: [ArtifactRecord] {
         run.artifacts
             .filter { PackageFilter.looksLikeIPA($0.name) }
@@ -96,35 +162,24 @@ struct RunDetailView: View {
         run.isActive ? run.status.label : run.conclusion.label
     }
 
-    private var statusSymbol: String {
-        if run.isActive { return "arrow.triangle.2.circlepath" }
-        switch run.conclusion {
-        case .success: return "checkmark.circle"
-        case .failure, .timedOut: return "xmark.circle"
-        default: return "minus.circle"
-        }
-    }
-
-    private var statusColor: Color {
+    private var tone: Color {
         if run.isActive { return StatusTone.running }
         switch run.conclusion {
-        case .success: return StatusTone.idle
         case .failure, .timedOut: return StatusTone.failed
-        default: return .secondary
+        default: return StatusTone.idle
         }
     }
 
-    private var elapsedText: String {
-        guard let start = run.startedAt else { return "—" }
-        let end = run.isActive ? Date() : run.updatedAt
-        let total = max(0, Int(end.timeIntervalSince(start)))
-        return "\(total / 60) 分 \(total % 60) 秒"
+    private func elapsed(now: Date) -> String {
+        guard let start = run.startedAt else {
+            return "排队 \(shortInterval(from: run.createdAt, to: now))"
+        }
+        return shortInterval(from: start, to: now)
     }
 
-    private func jobDuration(_ job: WorkflowJob) -> String {
-        guard let start = job.startedAt else { return "—" }
-        let total = max(0, Int((job.completedAt ?? Date()).timeIntervalSince(start)))
-        return "\(total / 60)m \(total % 60)s"
+    private func shortInterval(from start: Date, to end: Date) -> String {
+        let total = max(0, Int(end.timeIntervalSince(start)))
+        return "\(total / 60):\(String(format: "%02d", total % 60))"
     }
 
     private var owner: String {

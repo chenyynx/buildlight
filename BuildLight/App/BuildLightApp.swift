@@ -1,6 +1,6 @@
 import SwiftUI
 import SwiftData
-import UIKit
+import UserNotifications
 
 @main
 struct BuildLightApp: App {
@@ -31,6 +31,7 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.colorScheme) private var colorScheme
 
+
     /// 当前生效的强调色。切主题时整个 App 立刻跟着变。
     private var accent: Accent {
         environment.appearance.accent(for: colorScheme)
@@ -48,6 +49,7 @@ struct RootView: View {
         .environment(\.accent, accent)
         .environment(\.reducesMotion, environment.appearance.reduceMotionEnabled)
         .task {
+            UNUserNotificationCenter.current().delegate = NotificationDelegate.shared
             await environment.session.refreshIdentityIfNeeded()
             await NotificationService.shared.prepareIfNeeded()
         }

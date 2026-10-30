@@ -226,6 +226,22 @@ actor GitHubClient {
         return page.workflowRuns
     }
 
+    /// 仓库里的工作流名字列表。用于「只看某个工作流」的筛选。
+    func workflows(owner: String, repo: String) async throws -> [String] {
+        struct Envelope: Decodable {
+            let workflows: [Item]
+            struct Item: Decodable { let name: String; let path: String }
+        }
+        let envelope: Envelope = try await decode(
+            Envelope.self,
+            from: try await get(
+                "/repos/\(owner)/\(repo)/actions/workflows",
+                query: [URLQueryItem(name: "per_page", value: "100")]
+            )
+        )
+        return envelope.workflows.map(\.name)
+    }
+
     func jobs(owner: String, repo: String, runID: Int) async throws -> [WorkflowJob] {
         let page: JobsPage = try await decode(
             JobsPage.self,

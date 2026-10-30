@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import UserNotifications
 
 /// 构建事件的本机通知。
@@ -7,8 +8,12 @@ import UserNotifications
 /// 只在 App 进程还活着时生效（前台、刚切后台）。真正的「关掉 App 也能收」
 /// 要靠服务器侧常驻监视器。
 @MainActor
+@Observable
 final class NotificationService {
     static let shared = NotificationService()
+
+    /// 用户点了通知里的哪个 run。根视图监听它并跳转。
+    var pendingRunID: Int?
     nonisolated static let storageKey = "notifyBuildEvents"
 
     private(set) var isAuthorized = false
@@ -51,6 +56,12 @@ final class NotificationService {
             await refreshStatus()
             return false
         }
+    }
+
+    /// 点通知后把 runID 交给界面层消费一次。
+    func consumePendingRunID() -> Int? {
+        defer { pendingRunID = nil }
+        return pendingRunID
     }
 
     func notify(_ event: BuildEvent) async {

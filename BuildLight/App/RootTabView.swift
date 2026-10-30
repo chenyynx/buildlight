@@ -14,6 +14,10 @@ struct RootTabView: View {
     @Query private var runs: [RunRecord]
     @State private var selection: AppTab = .builds
 
+    /// 点了通知要打开的那条记录。
+    /// 用 sheet 而不是切 tab 再 push：从任何 tab、任何深度都能直接落到详情，返回时回到原位。
+    @State private var deepLinkedRun: RunRecord?
+
     private var activeCount: Int {
         runs.count(where: { $0.isActive })
     }
@@ -38,5 +42,22 @@ struct RootTabView: View {
             }
         }
         .background(LiveActivitySync())
+        .onChange(of: NotificationService.shared.pendingRunID) { _, runID in
+            guard let runID,
+                  let run = runs.first(where: { $0.id == runID })
+            else { return }
+            _ = NotificationService.shared.consumePendingRunID()
+            deepLinkedRun = run
+        }
+        .sheet(item: $deepLinkedRun) { run in
+            NavigationStack {
+                RunDetailView(run: run)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("完成") { deepLinkedRun = nil }
+                        }
+                    }
+            }
+        }
     }
 }

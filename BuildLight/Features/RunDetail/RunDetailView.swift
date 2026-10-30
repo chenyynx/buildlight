@@ -15,6 +15,21 @@ struct RunDetailView: View {
     @State private var isLoading = false
 
     var body: some View {
+        ScrollViewReader { proxy in
+            content
+                .onChange(of: jobs) { _, _ in
+                    scrollToFailure(proxy)
+                }
+        }
+        .scrollIndicators(.hidden)
+        .background(PaperBackground())
+        .navigationTitle("#\(run.number)")
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await load() }
+        .task(id: run.isActive) { await pollWhileRunning() }
+    }
+
+    private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 header
@@ -30,8 +45,10 @@ struct RunDetailView: View {
 
                 ForEach(jobs) { job in
                     SectionLabel(job.name)
+                        .id("job-\(job.id)")
                     ForEach(job.steps) { step in
                         StepRow(step: step)
+                            .id("step-\(step.id)")
                     }
                     Hairline(leading: DS.pad)
                 }
@@ -48,13 +65,20 @@ struct RunDetailView: View {
             }
             .padding(.bottom, 40)
         }
-        .scrollIndicators(.hidden)
-        .background(PaperBackground())
-        .navigationTitle("#\(run.number)")
-        .navigationBarTitleDisplayMode(.inline)
-        .task { await load() }
-        .task(id: run.isActive) { await pollWhileRunning() }
         .refreshable { await load() }
+    }
+
+    /// 失败运行时自动滚到第一个失败步骤——
+    /// 用户点进一条失败的记录，想看的就是「哪一步挂了」，
+    /// 不应该让他从头往下翻。
+    private func scrollToFailure(_ proxy: ScrollViewProxy) {
+        guard let failed = jobs
+            .flatMap(\.steps)
+            .first(where: { $0.conclusion == .failure || $0.conclusion == .timedOut })
+        else { return }
+        withAnimation(Motion.settle) {
+            proxy.scrollTo("step-\(failed.id)", anchor: .center)
+        }
     }
 
     // MARK: 头部

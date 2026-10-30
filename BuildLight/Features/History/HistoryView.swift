@@ -12,6 +12,7 @@ struct HistoryView: View {
 
     @State private var expandedRepoIDs: Set<String> = []
     @State private var hasInitialized = false
+    @State private var searchText = ""
 
     var body: some View {
         NavigationStack {
@@ -29,6 +30,7 @@ struct HistoryView: View {
             .background(PaperBackground())
             .navigationTitle("历史")
             .navigationBarTitleDisplayMode(.large)
+            .searchable(text: $searchText, prompt: "搜索仓库、分支、标题")
             .navigationDestination(for: RunRoute.self) { route in
                 if let run = runs.first(where: { $0.id == route.runID }) {
                     RunDetailView(run: run)
@@ -52,7 +54,9 @@ struct HistoryView: View {
                 }
             }
             .overlay {
-                if runs.isEmpty {
+                if groups.isEmpty && !searchText.isEmpty {
+                    ContentUnavailableView.search
+                } else if runs.isEmpty {
                     ContentUnavailableView(
                         "还没有记录",
                         systemImage: "clock",
@@ -78,7 +82,14 @@ struct HistoryView: View {
     }
 
     private var groups: [HistoryRepoGroup] {
-        Dictionary(grouping: runs, by: \.repoFullName)
+        let filtered = searchText.isEmpty ? runs : runs.filter { run in
+            run.repoFullName.localizedStandardContains(searchText)
+                || (run.branch ?? "").localizedStandardContains(searchText)
+                || (run.title ?? "").localizedStandardContains(searchText)
+                || (run.workflowName ?? "").localizedStandardContains(searchText)
+                || run.sha.localizedStandardContains(searchText)
+        }
+        return Dictionary(grouping: filtered, by: \.repoFullName)
             .map { HistoryRepoGroup(repoFullName: $0.key, runs: $0.value) }
             .sorted { lhs, rhs in
                 let left = lhs.runs.first?.createdAt ?? .distantPast

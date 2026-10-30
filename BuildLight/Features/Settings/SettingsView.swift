@@ -79,6 +79,19 @@ struct SettingsView: View {
                             title: "轮询状态",
                             value: environment.monitor.isRefreshing ? "刷新中" : "空闲"
                         )
+
+                        Hairline(leading: 54)
+
+                        NavigationLink(value: SettingsRoute.repos) {
+                            FunctionRow(
+                                systemImage: "list.bullet.rectangle",
+                                tint: accent.primary,
+                                title: "管理仓库",
+                                value: "增删 · 排序 · 限定工作流",
+                                showsChevron: true
+                            )
+                        }
+                        .buttonStyle(PressableStyle())
                     }
 
                     SectionLabel("通知")
@@ -158,6 +171,7 @@ struct SettingsView: View {
             .navigationDestination(for: SettingsRoute.self) { route in
                 switch route {
                 case .cache: CacheView()
+                case .repos: RepoListView()
                 }
             }
             .confirmationDialog("退出后需要重新填写 Token", isPresented: $showingSignOutConfirmation) {

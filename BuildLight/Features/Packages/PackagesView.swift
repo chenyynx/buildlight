@@ -40,6 +40,7 @@ struct PackagesView: View {
             .background(PaperBackground())
             .navigationTitle("产物")
             .navigationBarTitleDisplayMode(.large)
+            .refreshable { await environment.monitor.refreshNow() }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     if !environment.cache.entries.isEmpty {

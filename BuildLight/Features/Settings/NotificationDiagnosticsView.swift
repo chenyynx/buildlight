@@ -52,9 +52,14 @@ struct NotificationDiagnosticsView: View {
                     ok: BackgroundExecutionKeeper.shared.isHoldingWindow
                 )
                 diagnosticRow(
-                    "静音保活",
+                    "保活腿 · 静音音频",
                     value: keepAliveText,
                     ok: BackgroundKeepAlive.shared.isKeepingAlive
+                )
+                diagnosticRow(
+                    "保活腿 · 后台定位",
+                    value: locationText,
+                    ok: LocationKeepAlive.shared.isRunning
                 )
 
                 if !BackgroundKeepAlive.shared.isKeepingAlive {
@@ -71,9 +76,18 @@ struct NotificationDiagnosticsView: View {
 
             Section("后台持续监控") {
                 Toggle("构建在跑时保持活跃", isOn: keepAliveBinding)
-                Text("开关在「设置 → 后台」里，这里也能直接改。")
+                Toggle("同时使用后台定位兜底", isOn: locationBinding)
+
+                if LocationKeepAlive.isEnabled && !LocationKeepAlive.shared.isAuthorized {
+                    Button("授予定位权限") {
+                        LocationKeepAlive.shared.requestAuthorization()
+                    }
+                }
+
+                Text("两条腿互为备份：音频被来电或其他播放器抢占时，定位更新继续维持进程。定位只取大致位置（3 公里精度），不记录、不上传。")
                     .font(Type.caption)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Section {
@@ -128,6 +142,32 @@ struct NotificationDiagnosticsView: View {
             return "当前没有构建在跑，不占用后台。等有构建启动、并且你把 App 切到后台时才会开启。"
         }
         return "有 \(running) 个构建在跑。App 留在前台时不会开启；切到后台后会自动启动。"
+    }
+
+    /// 定位腿的状态。
+    private var locationText: String {
+        guard LocationKeepAlive.isEnabled else { return "已关闭" }
+        guard LocationKeepAlive.shared.isAuthorized else { return "未授权" }
+        guard LocationKeepAlive.shared.isRunning else { return "待命中" }
+        if let last = LocationKeepAlive.shared.lastUpdateAt {
+            let seconds = Int(Date.now.timeIntervalSince(last))
+            return "运行中 · \(seconds)秒前有定位"
+        }
+        return "运行中"
+    }
+
+    private var locationBinding: Binding<Bool> {
+        Binding(
+            get: { LocationKeepAlive.isEnabled },
+            set: { newValue in
+                UserDefaults.standard.set(newValue, forKey: LocationKeepAlive.storageKey)
+                if newValue {
+                    LocationKeepAlive.shared.requestAuthorization()
+                } else {
+                    LocationKeepAlive.shared.stop()
+                }
+            }
+        )
     }
 
     private var keepAliveBinding: Binding<Bool> {

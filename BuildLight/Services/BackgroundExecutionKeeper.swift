@@ -44,9 +44,10 @@ final class BackgroundExecutionKeeper {
         guard assertion != .invalid else { return }
         isHoldingWindow = true
 
-        // 后台断言只能撑几十秒。真正的长时保活靠静音音频，
-        // 否则构建跑到一半进程被挂起，照样收不到通知。
+        // 后台断言只能撑几十秒。真正的长时保活靠两条腿：
+        // 静音音频（主）+ 后台定位（音频被抢时的兜底）。
         BackgroundKeepAlive.shared.start(reason: "backgrounded")
+        LocationKeepAlive.shared.start()
 
         loop = Task { [weak self] in
             guard let self else { return }
@@ -59,6 +60,7 @@ final class BackgroundExecutionKeeper {
                 )) ?? []
                 if stillActive.isEmpty {
                     BackgroundKeepAlive.shared.stop()
+                    LocationKeepAlive.shared.stop()
                     break
                 }
 
@@ -73,6 +75,7 @@ final class BackgroundExecutionKeeper {
         loop?.cancel()
         loop = nil
         BackgroundKeepAlive.shared.stop()
+        LocationKeepAlive.shared.stop()
 
         guard assertion != .invalid else { return }
         UIApplication.shared.endBackgroundTask(assertion)

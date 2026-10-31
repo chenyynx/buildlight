@@ -57,6 +57,9 @@ struct RootView: View {
         .environment(\.accent, accent)
         .environment(\.reducesMotion, environment.appearance.reduceMotionEnabled)
         .task {
+            // CoreLocation 的初始化会同步走一次 locationd IPC，
+            // 只能放在 Scene 建立之后，不能塞进 App.init 的启动关键路径。
+            LocationKeepAlive.shared.configure()
             await environment.session.refreshIdentityIfNeeded()
             await NotificationService.shared.prepareIfNeeded()
             // 冷启动时 scenePhase 初始就是 .active，onChange 不会触发。

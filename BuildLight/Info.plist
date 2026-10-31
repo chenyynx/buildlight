@@ -11,7 +11,14 @@
 		<!-- 静音音频保活：构建在跑时循环播一段静音，
 		     系统据此认定 App 在做音频播放，不会挂起进程。 -->
 		<string>audio</string>
+		<!-- 定位保活腿：音频被来电/其他播放器抢占时，
+		     靠持续定位维持进程存活。 -->
+		<string>location</string>
 	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>构建进行中时用于在后台保持 App 活跃，以便及时提醒你构建完成。只取大致位置，不会记录或上传。</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>构建进行中时用于在后台保持 App 活跃，以便及时提醒你构建完成。只取大致位置，不会记录或上传。</string>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
 		<string>org.example.buildlight.refresh</string>

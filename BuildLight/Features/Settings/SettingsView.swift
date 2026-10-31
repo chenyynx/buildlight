@@ -124,6 +124,18 @@ struct SettingsView: View {
                         .padding(.horizontal, 16)
                         .padding(.vertical, 9)
 
+                        Hairline(leading: 54)
+                        NavigationLink(value: SettingsRoute.notificationDiagnostics) {
+                            FunctionRow(
+                                systemImage: "waveform.badge.magnifyingglass",
+                                tint: .gray,
+                                title: "通知诊断",
+                                value: notificationAuthorized ? "正常" : "未授权",
+                                showsChevron: true
+                            )
+                        }
+                        .buttonStyle(PressableStyle())
+
                         if notificationDenied {
                             Hairline(leading: 54)
                             Button {
@@ -185,6 +197,7 @@ struct SettingsView: View {
             .navigationDestination(for: SettingsRoute.self) { route in
                 switch route {
                 case .repos: RepoListView()
+                case .notificationDiagnostics: NotificationDiagnosticsView()
                 }
             }
             .confirmationDialog("退出后需要重新填写 Token", isPresented: $showingSignOutConfirmation) {

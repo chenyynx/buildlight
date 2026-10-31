@@ -16,6 +16,11 @@ final class NotificationService {
 
     private(set) var isAuthorized = false
     private(set) var isDenied = false
+    /// 上一次真正投递成功的通知，用于设置页诊断。
+    private(set) var lastDeliveredAt: Date?
+    private(set) var lastDeliveredTitle: String?
+    /// 通知被丢弃的原因。没送达时用户能看到「为什么」，而不是一片沉默。
+    private(set) var lastSkipReason: String?
 
     var isEnabled: Bool {
         UserDefaults.standard.object(forKey: Self.storageKey) as? Bool ?? true
@@ -61,7 +66,7 @@ final class NotificationService {
     /// 和「构建完成」分开：包通常比整条 run 早几分钟生成，
     /// 这是用户真正在等的那个时刻。
     func notifyPackageReady(repo: String, name: String, sizeBytes: Int, runNumber: Int) async {
-        guard isEnabled, isAuthorized else { return }
+        guard await ensureDeliverable() else { return }
 
         let content = UNMutableNotificationContent()
         content.title = "安装包就绪 · \(repo)"
@@ -79,11 +84,11 @@ final class NotificationService {
             content: content,
             trigger: nil
         )
-        try? await UNUserNotificationCenter.current().add(request)
+        await deliver(request, title: content.title)
     }
 
     func notify(_ event: BuildEvent) async {
-        guard isEnabled, isAuthorized else { return }
+        guard await ensureDeliverable() else { return }
 
         let content = UNMutableNotificationContent()
         content.title = event.title
@@ -102,7 +107,43 @@ final class NotificationService {
             content: content,
             trigger: nil
         )
-        try? await UNUserNotificationCenter.current().add(request)
+        await deliver(request, title: content.title)
+    }
+
+    /// 投递前确认一次真的能送达。
+    ///
+    /// 不能只信启动时缓存的 `isAuthorized`：
+    /// 用户可能在系统设置里刚打开权限，也可能刚关掉，
+    /// 缓存过期就会出现「明明开着却一条都不发」。
+    private func ensureDeliverable() async -> Bool {
+        guard isEnabled else {
+            lastSkipReason = "设置里关掉了构建提醒"
+            return false
+        }
+
+        await refreshStatus()
+
+        switch true {
+        case isAuthorized:
+            return true
+        case isDenied:
+            lastSkipReason = "系统通知权限被拒绝"
+            return false
+        default:
+            lastSkipReason = "系统还没授予通知权限"
+            return false
+        }
+    }
+
+    private func deliver(_ request: UNNotificationRequest, title: String) async {
+        do {
+            try await UNUserNotificationCenter.current().add(request)
+            lastDeliveredAt = .now
+            lastDeliveredTitle = title
+            lastSkipReason = nil
+        } catch {
+            lastSkipReason = "投递失败：\(error.localizedDescription)"
+        }
     }
 }
 

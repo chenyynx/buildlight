@@ -22,6 +22,7 @@ struct BuildLightApp: App {
         UNUserNotificationCenter.current().delegate = NotificationDelegate.shared
         // 后台任务必须在启动完成前注册，晚了系统会抛异常。
         BackgroundRefresh.shared.register(environment: environment)
+        BackgroundExecutionKeeper.shared.attach(environment: environment)
     }
 
     var body: some Scene {
@@ -66,14 +67,24 @@ struct RootView: View {
             await environment.monitor.refreshAll()
         }
         .onChange(of: scenePhase) { _, phase in
-            guard phase == .active, environment.session.isSignedIn else {
-                if phase == .background { BackgroundRefresh.shared.schedule() }
-                return
+            switch phase {
+            case .active:
+                guard environment.session.isSignedIn else { return }
+                BackgroundExecutionKeeper.shared.end()
+                environment.monitor.start()
+                // 回前台立刻全量刷一遍：挂起期间数据是旧的，
+                // 用户第一眼看到的必须是真实状态，而不是几秒前的快照。
+                Task { await environment.monitor.refreshAll() }
+            case .background:
+                guard environment.session.isSignedIn else { return }
+                // 两件事一起做：
+                // 1. 排一个 BGAppRefresh，给十几分钟后一次机会
+                // 2. 立刻申请后台执行窗口，把「刚切走就结束」的构建抓住
+                BackgroundRefresh.shared.schedule()
+                BackgroundExecutionKeeper.shared.beginIfNeeded()
+            default:
+                break
             }
-            environment.monitor.start()
-            // 回前台立刻全量刷一遍：挂起期间数据是旧的，
-            // 用户第一眼看到的必须是真实状态，而不是几秒前的快照。
-            Task { await environment.monitor.refreshAll() }
         }
     }
 }

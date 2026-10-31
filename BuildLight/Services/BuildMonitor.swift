@@ -459,6 +459,8 @@ final class BuildMonitor {
                         if announce, !announcedPackages.contains(best.id) {
                             announcedPackages.insert(best.id)
                             let message = (
+                                runID: runID,
+                                fullName: repo.fullName,
                                 repo: repo.displayName,
                                 name: best.name,
                                 size: best.sizeInBytes,
@@ -466,6 +468,8 @@ final class BuildMonitor {
                             )
                             Task {
                                 await NotificationService.shared.notifyPackageReady(
+                                    runID: message.runID,
+                                    repoFullName: message.fullName,
                                     repo: message.repo,
                                     name: message.name,
                                     sizeBytes: message.size,

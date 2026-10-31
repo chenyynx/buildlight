@@ -65,7 +65,14 @@ final class NotificationService {
     ///
     /// 和「构建完成」分开：包通常比整条 run 早几分钟生成，
     /// 这是用户真正在等的那个时刻。
-    func notifyPackageReady(repo: String, name: String, sizeBytes: Int, runNumber: Int) async {
+    func notifyPackageReady(
+        runID: Int,
+        repoFullName: String,
+        repo: String,
+        name: String,
+        sizeBytes: Int,
+        runNumber: Int
+    ) async {
         guard await ensureDeliverable() else { return }
 
         let content = UNMutableNotificationContent()
@@ -77,10 +84,16 @@ final class NotificationService {
         content.body = parts.joined(separator: " · ")
         content.sound = .default
         content.threadIdentifier = "package-\(repo)"
-        content.userInfo = ["repo": repo]
+        // 必须带 runID：点通知要落到那条构建上。
+        // 只带仓库名的话，delegate 不知道跳到哪，只能把 App 打开停在原地——
+        // 就是「点了没反应 / 空跳转」。
+        content.userInfo = [
+            "runID": runID,
+            "repo": repoFullName
+        ]
 
         let request = UNNotificationRequest(
-            identifier: "package-\(repo)-\(name)-\(runNumber)",
+            identifier: "package-\(repoFullName)-\(name)-\(runNumber)",
             content: content,
             trigger: nil
         )

@@ -14,15 +14,17 @@ final class DeepLinkRouter {
     static let shared = DeepLinkRouter()
 
     struct Pending: Equatable, Identifiable {
-        let runID: Int
+        /// 有 runID 就精确落到那条构建。
+        let runID: Int?
+        /// 没有 runID（老通知、或只带了仓库）时，退回到这个仓库的最新一条。
         let repoFullName: String?
 
-        var id: Int { runID }
+        var id: String { "\(runID ?? -1)-\(repoFullName ?? "")" }
     }
 
     private(set) var pending: Pending?
 
-    func open(runID: Int, repoFullName: String?) {
+    func open(runID: Int?, repoFullName: String?) {
         pending = Pending(runID: runID, repoFullName: repoFullName)
     }
 

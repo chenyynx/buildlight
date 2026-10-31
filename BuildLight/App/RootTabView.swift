@@ -13,6 +13,7 @@ enum AppTab: Hashable {
 struct RootTabView: View {
     @Environment(AppEnvironment.self) private var environment
     @Query private var runs: [RunRecord]
+    @Query(sort: \RepoRecord.sortIndex) private var repos: [RepoRecord]
     @State private var selection: AppTab = .builds
 
     /// 点了通知要打开的那条记录。
@@ -78,7 +79,8 @@ struct RootTabView: View {
     private func resolvePendingDeepLink() {
         guard let pending = DeepLinkRouter.shared.consume() else { return }
 
-        if let run = runs.first(where: { $0.id == pending.runID }) {
+        if let runID = pending.runID,
+           let run = runs.first(where: { $0.id == runID }) {
             deepLinkedRun = run
             return
         }
@@ -88,10 +90,21 @@ struct RootTabView: View {
             return
         }
 
+        // 没有 runID 时退一步：用这个仓库最近一条构建。
+        let fallbackRunID = pending.runID
+            ?? repos.first(where: { $0.fullName == fullName })?.latestRunID
+
+        guard let targetID = fallbackRunID else {
+            // 连这个仓库的最新构建都不知道 → 老实说找不到，
+            // 不要停在首页让用户以为点了没反应。
+            deepLinkMissed = true
+            return
+        }
+
         Task {
             if let fetched = await environment.monitor.ensureRun(
                 repoFullName: fullName,
-                runID: pending.runID
+                runID: targetID
             ) {
                 deepLinkedRun = fetched
             } else {

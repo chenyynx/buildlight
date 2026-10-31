@@ -27,8 +27,12 @@ final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
         didReceive response: UNNotificationResponse
     ) async {
         let info = response.notification.request.content.userInfo
-        guard let runID = info["runID"] as? Int else { return }
+        // 两种通知的载荷不完全一样：构建完成带 runID，安装包就绪也带；
+        // 老版本发出去的可能只有仓库名——那种情况下退回到仓库的最新一条，
+        // 总之不能「点开就停在原地」。
+        let runID = info["runID"] as? Int
         let repo = info["repo"] as? String
+        guard runID != nil || repo != nil else { return }
         await MainActor.run {
             DeepLinkRouter.shared.open(runID: runID, repoFullName: repo)
         }

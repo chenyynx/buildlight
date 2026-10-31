@@ -161,7 +161,7 @@ struct SettingsView: View {
                             glyph("waveform", tint: accent.primary)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("后台持续监控")
-                                    .font(.scaledFont(size: 15))
+                                    .scaledFont(size: 15)
                                 Text("构建进行中时保持 App 活跃，结束后自动收紧")
                                     .font(Type.caption)
                                     .foregroundStyle(.secondary)

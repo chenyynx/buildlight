@@ -71,6 +71,7 @@ struct RootView: View {
             case .active:
                 guard environment.session.isSignedIn else { return }
                 BackgroundExecutionKeeper.shared.end()
+                BackgroundKeepAlive.shared.verifyStillRunning()
                 environment.monitor.start()
                 // 回前台立刻全量刷一遍：挂起期间数据是旧的，
                 // 用户第一眼看到的必须是真实状态，而不是几秒前的快照。

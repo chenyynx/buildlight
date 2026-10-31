@@ -8,6 +8,9 @@
 	<array>
 		<string>fetch</string>
 		<string>processing</string>
+		<!-- 静音音频保活：构建在跑时循环播一段静音，
+		     系统据此认定 App 在做音频播放，不会挂起进程。 -->
+		<string>audio</string>
 	</array>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>

@@ -44,16 +44,23 @@ final class BackgroundExecutionKeeper {
         guard assertion != .invalid else { return }
         isHoldingWindow = true
 
+        // 后台断言只能撑几十秒。真正的长时保活靠静音音频，
+        // 否则构建跑到一半进程被挂起，照样收不到通知。
+        BackgroundKeepAlive.shared.start(reason: "backgrounded")
+
         loop = Task { [weak self] in
             guard let self else { return }
             while !Task.isCancelled {
                 await environment.monitor.refreshAll()
 
-                // 全部跑完就没必要继续占着窗口。
+                // 全部跑完就没必要继续占着窗口，也别再放静音了。
                 let stillActive = (try? environment.context.fetch(
                     FetchDescriptor<RepoRecord>(predicate: #Predicate { $0.activeRunCount > 0 })
                 )) ?? []
-                if stillActive.isEmpty { break }
+                if stillActive.isEmpty {
+                    BackgroundKeepAlive.shared.stop()
+                    break
+                }
 
                 try? await Task.sleep(for: .seconds(5))
             }
@@ -65,6 +72,7 @@ final class BackgroundExecutionKeeper {
     func end() {
         loop?.cancel()
         loop = nil
+        BackgroundKeepAlive.shared.stop()
 
         guard assertion != .invalid else { return }
         UIApplication.shared.endBackgroundTask(assertion)

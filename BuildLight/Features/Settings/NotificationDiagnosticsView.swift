@@ -50,6 +50,11 @@ struct NotificationDiagnosticsView: View {
                     value: BackgroundExecutionKeeper.shared.isHoldingWindow ? "持有中" : "未持有",
                     ok: BackgroundExecutionKeeper.shared.isHoldingWindow
                 )
+                diagnosticRow(
+                    "静音保活",
+                    value: keepAliveText,
+                    ok: BackgroundKeepAlive.shared.isKeepingAlive
+                )
                 LabeledContent(
                     "上次前台刷新",
                     value: environment.monitor.lastRefreshAt?.formatted(date: .abbreviated, time: .standard) ?? "—"
@@ -62,10 +67,12 @@ struct NotificationDiagnosticsView: View {
                 }
             } footer: {
                 Text("""
-                自签包没有 APNs，收不到远程推送。本地通知只在 App 进程还活着时生效：\
-                前台一定收得到，刚切到后台的几十秒内也收得到。\
-                更久的等待由系统按自己的节奏调度，不保证时间点——\
-                要「关掉 App 也能收」，需要服务器侧常驻监视器。
+                自签包没有 APNs，收不到远程推送。\
+                构建进行中时，「后台持续监控」会用一段听不见的静音音频\
+                让系统认为 App 仍在工作，从而不在后台挂起进程——\
+                这样构建结束的那一刻能检测到并弹出通知。\
+                全部构建结束时保活会自动停止，不白耗电。\
+                App 被手动划掉之后仍然收不到，那种情况需要服务器侧监视器。
                 """)
             }
         }
@@ -81,6 +88,16 @@ struct NotificationDiagnosticsView: View {
             Text(value)
                 .foregroundStyle(ok ? .secondary : StatusTone.failed)
         }
+    }
+
+    /// 静音保活的状态。带启动时间，能看出它是不是一直挂着。
+    private var keepAliveText: String {
+        guard BackgroundKeepAlive.shared.isKeepingAlive else {
+            return BackgroundKeepAlive.isEnabled ? "未启动" : "已关闭"
+        }
+        guard let start = BackgroundKeepAlive.shared.startedAt else { return "运行中" }
+        let seconds = Int(Date.now.timeIntervalSince(start))
+        return "运行中 · \(seconds / 60)分\(seconds % 60)秒"
     }
 
     private var authorizationText: String {

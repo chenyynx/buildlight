@@ -18,6 +18,7 @@ struct SettingsView: View {
     @State private var notificationAuthorized = false
     /// 主屏图标。系统是唯一事实源，这里只做镜像。
     @State private var appIcon: AppIconOption = .current
+    @AppStorage(BackgroundKeepAlive.storageKey) private var keepAliveEnabled = true
     @State private var showingSignOutConfirmation = false
     @State private var isSyncing = false
 
@@ -152,6 +153,26 @@ struct SettingsView: View {
                             }
                             .buttonStyle(PressableStyle())
                         }
+                    }
+
+                    SectionLabel("后台")
+                    GroupBox2 {
+                        HStack(spacing: 12) {
+                            glyph("waveform", tint: accent.primary)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("后台持续监控")
+                                    .font(.scaledFont(size: 15))
+                                Text("构建进行中时保持 App 活跃，结束后自动收紧")
+                                    .font(Type.caption)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            Spacer(minLength: 8)
+                            Toggle("", isOn: $keepAliveEnabled)
+                                .labelsHidden()
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 9)
                     }
 
                     SectionLabel("存储")

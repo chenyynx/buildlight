@@ -53,6 +53,9 @@ final class BackgroundRefresh {
                 FetchDescriptor<RepoRecord>(predicate: #Predicate { $0.activeRunCount > 0 })
             )) ?? []
             guard !active.isEmpty else { return }
+            // 被系统唤醒时也顺手拉起保活：这一轮刷新要是赶上了构建结束，
+            // 后续的收尾通知还得靠进程活着。
+            BackgroundKeepAlive.shared.start(reason: "bgRefresh")
             await environment.monitor.refreshAll()
         }
 

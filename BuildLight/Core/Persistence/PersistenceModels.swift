@@ -173,6 +173,17 @@ final class ArtifactRecord {
         ByteCountFormatter.string(fromByteCount: Int64(sizeBytes), countStyle: .file)
     }
 
+    /// 网页版直链。
+    ///
+    /// GitHub 的 `archive_download_url` 是 API 端点，必须带 Bearer token，
+    /// 直接粘到浏览器里会返回 401。真正能粘进浏览器下载的是这个网页地址——
+    /// 已登录 GitHub 时点开就能拿到 zip。
+    var webDownloadURL: URL? {
+        let parts = run?.repoFullName.split(separator: "/") ?? []
+        guard parts.count == 2 else { return nil }
+        return URL(string: "https://github.com/\(parts[0])/\(parts[1])/actions/runs/\(runID)/artifacts/\(id)")
+    }
+
     var value: Artifact {
         Artifact(
             id: id,

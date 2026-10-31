@@ -234,18 +234,41 @@ struct RunDetailView: View {
                 }
             }
 
-            Link(destination: run.htmlURL) {
-                Text("在浏览器中打开")
-                    .scaledFont(size: 14)
+            HStack(spacing: 10) {
+                if let packageURL = copyablePackageURL {
+                    CopyLinkButton(url: packageURL)
+                }
+
+                Link(destination: run.htmlURL) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "safari")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text("浏览器打开")
+                            .scaledFont(size: 14)
+                    }
                     .foregroundStyle(accent.primary)
                     .frame(maxWidth: .infinity)
                     .frame(height: 40)
+                    .background(accent.primary.opacity(0.10), in: .rect(cornerRadius: 12))
+                }
             }
         }
         .padding(.horizontal, DS.pad)
     }
 
     // MARK: 计算
+
+    /// 底部「复制下载直链」用哪个地址。
+    ///
+    /// 优先复制安装包的网页直链——那才是能直接粘进浏览器下载的东西；
+    /// 没有产物时退回运行页地址，至少能分享这次构建。
+    private var copyablePackageURL: URL? {
+        if let artifact = sortedArtifacts.first(where: { !$0.expired }),
+           let webURL = artifact.webDownloadURL {
+            return webURL
+        }
+        return run.htmlURL
+    }
 
     private var sortedArtifacts: [ArtifactRecord] {
         artifacts.filter { PackageFilter.looksLikeIPA($0.name) }

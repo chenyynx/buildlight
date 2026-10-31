@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct ArtifactRow: View {
     @Environment(AppEnvironment.self) private var environment
@@ -43,6 +44,9 @@ struct ArtifactRow: View {
                     .scaledFont(size: 11)
                     .foregroundStyle(.tertiary)
             } else {
+                if let webURL = artifact.webDownloadURL {
+                    CopyLinkButton(url: webURL, compact: true)
+                }
                 PackageButton(
                     target: PackageTarget(
                         id: artifact.id,
@@ -58,6 +62,20 @@ struct ArtifactRow: View {
             }
         }
         .padding(.horizontal, DS.pad)
+        // 长按也能复制，给习惯手势的人一条路。
+        .contextMenu {
+            if let webURL = artifact.webDownloadURL {
+                Button("复制下载直链", systemImage: "doc.on.doc") {
+                    UIPasteboard.general.string = webURL.absoluteString
+                }
+                Button("在浏览器打开", systemImage: "safari") {
+                    UIApplication.shared.open(webURL)
+                }
+            }
+            Button("复制 API 地址（需 Token，仅调试用）", systemImage: "key") {
+                UIPasteboard.general.string = artifact.downloadURL.absoluteString
+            }
+        }
         .padding(.vertical, 10)
         .animation(.easeOut(duration: 0.18), value: state)
     }

@@ -91,11 +91,17 @@ struct AppIconPicker: View {
         }
 
         withAnimation(Motion.settle) { selection = option }
+
         UIApplication.shared.setAlternateIconName(option.alternateName) { error in
-            guard error != nil else { return }
-            // 失败时回到系统真实状态，不要留一个「选了但没生效」的假象。
             Task { @MainActor in
-                selection = AppIconOption.current
+                if error != nil {
+                    // 失败：回到真实状态，不留「选了但没生效」的假象。
+                    selection = AppIconOption.current
+                    return
+                }
+                // 成功：记下来。系统值回读不可靠，
+                // 没有这行的话退出前台再回来就会被判回「原色」。
+                AppIconOption.remember(option)
             }
         }
     }

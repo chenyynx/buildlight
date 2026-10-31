@@ -51,9 +51,45 @@ enum AppIconOption: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// 当前系统上生效的图标。
+    /// 本地记录。
+    ///
+    /// **为什么不能只信 `UIApplication.shared.alternateIconName`**：
+    /// 它在自签重打包的包上不可靠——设置成功后能读到，
+    /// 但 App 退到后台再回来时可能返回 nil，
+    /// 界面就会被判成「原色」，而主屏上明明是彩色的。
+    /// 所以这里自己存一份，读的时候以系统值为准、读不到再退回本地记录。
+    private static let storageKey = "selectedAppIconOption"
+
+    var isInstalled: Bool {
+        UIApplication.shared.alternateIconName != nil || self == .default
+    }
+
+    /// 当前生效的图标。系统值优先，取不到用本地记录兜底。
     static var current: AppIconOption {
-        guard let name = UIApplication.shared.alternateIconName else { return .default }
-        return allCases.first { $0.alternateName == name } ?? .default
+        resolve(
+            systemName: UIApplication.shared.alternateIconName,
+            storedRaw: UserDefaults.standard.string(forKey: storageKey)
+        )
+    }
+
+    /// 纯解析（可单测）。
+    ///
+    /// 三种情况：
+    /// 1. 系统给了可识别的名字 → 听系统的
+    /// 2. 系统给了名字但匹配不上（旧版本残留 / 图标被移除）→ 原色
+    /// 3. 系统给 nil（自签包常见的回读失败）→ 用本地记录，再没有就原色
+    static func resolve(systemName: String?, storedRaw: String?) -> AppIconOption {
+        if let systemName {
+            return allCases.first { $0.alternateName == systemName } ?? .default
+        }
+        if let storedRaw, let stored = AppIconOption(rawValue: storedRaw) {
+            return stored
+        }
+        return .default
+    }
+
+    /// 切换成功后落一份本地记录。
+    static func remember(_ option: AppIconOption) {
+        UserDefaults.standard.set(option.rawValue, forKey: storageKey)
     }
 }

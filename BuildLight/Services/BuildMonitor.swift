@@ -208,6 +208,7 @@ final class BuildMonitor {
         let existing = (try? context.fetch(
             FetchDescriptor<ArtifactRecord>(predicate: #Predicate { $0.runID == runID })
         )) ?? []
+        // 本地已有记录就不重复请求。
         guard existing.isEmpty else { return true }
 
         let parts = run.repoFullName.split(separator: "/")

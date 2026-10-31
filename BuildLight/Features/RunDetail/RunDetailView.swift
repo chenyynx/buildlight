@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 
 /// 单次运行的详情页：耗时大数字 + 步骤流 + 产物 + 操作。
@@ -10,6 +11,14 @@ struct RunDetailView: View {
     @Environment(\.accent) private var accent
     let run: RunRecord
 
+    /// 产物用独立 `@Query` 读，不走 `run.artifacts` 关系。
+    ///
+    /// 两个原因：
+    /// 1. 关系数组是 SwiftData 的懒加载集合，页面持有的是普通 `let run`，
+    ///    新插入的产物不保证触发重绘——表现为「有时候不显示，退出去再进来又有」。
+    /// 2. `@Query` 由存储驱动，插入即成真，下载中也不会突然消失。
+    @Query private var artifacts: [ArtifactRecord]
+
     @State private var jobs: [WorkflowJob] = []
     @State private var loadError: AppError?
     @State private var isLoading = false
@@ -17,6 +26,15 @@ struct RunDetailView: View {
     /// 不加这个标记的话，用户往上翻会被每 3 秒拽回失败步骤。
     @State private var didAutoScroll = false
     @State private var didLoadArtifacts = false
+
+    init(run: RunRecord) {
+        self.run = run
+        let runID = run.id
+        _artifacts = Query(
+            filter: #Predicate<ArtifactRecord> { $0.runID == runID },
+            sort: [SortDescriptor(\ArtifactRecord.sizeBytes, order: .reverse)]
+        )
+    }
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -65,10 +83,29 @@ struct RunDetailView: View {
                 }
 
                 if !sortedArtifacts.isEmpty {
-                    SectionLabel("安装包")
+                    SectionLabel("安装包", trailing: "\(sortedArtifacts.count)")
                     ForEach(sortedArtifacts) { artifact in
                         ArtifactRow(artifact: artifact)
                     }
+                } else if !didLoadArtifacts {
+                    // 「还在拉」和「确实没有」必须分开显示。
+                    // 之前两者都渲染成空白，用户根本不知道是没有包还是没加载出来。
+                    SectionLabel("安装包")
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text("正在获取产物…")
+                            .font(Type.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, DS.pad)
+                    .padding(.vertical, 8)
+                } else {
+                    SectionLabel("安装包")
+                    Text("这次构建没有产出安装包")
+                        .font(Type.caption)
+                        .foregroundStyle(.tertiary)
+                        .padding(.horizontal, DS.pad)
+                        .padding(.vertical, 8)
                 }
 
                 actions
@@ -76,7 +113,11 @@ struct RunDetailView: View {
             }
             .padding(.bottom, 40)
         }
-        .refreshable { await load() }
+        .refreshable {
+            await load()
+            didLoadArtifacts = false
+            await loadArtifactsIfNeeded()
+        }
     }
 
     /// 失败运行时自动滚到第一个失败步骤——
@@ -207,9 +248,7 @@ struct RunDetailView: View {
     // MARK: 计算
 
     private var sortedArtifacts: [ArtifactRecord] {
-        run.artifacts
-            .filter { PackageFilter.looksLikeIPA($0.name) }
-            .sorted { $0.sizeBytes > $1.sizeBytes }
+        artifacts.filter { PackageFilter.looksLikeIPA($0.name) }
     }
 
     private var statusText: String {
@@ -235,10 +274,14 @@ struct RunDetailView: View {
     // MARK: 行为
 
     /// 老运行的产物没在首页预拉过，进详情页时补一次。
+    ///
+    /// 只有**成功**才置位：之前是先置位再请求，
+    /// 一次断网/取消就永久放弃，这个页面实例再也不会补拉。
     private func loadArtifactsIfNeeded() async {
         guard !didLoadArtifacts else { return }
-        didLoadArtifacts = true
-        await environment.monitor.ensureArtifacts(for: run)
+        if await environment.monitor.ensureArtifacts(for: run) {
+            didLoadArtifacts = true
+        }
     }
 
     private func load() async {

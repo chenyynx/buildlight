@@ -167,3 +167,49 @@ pause 立即作废旧 token。
 A → 构建验证 → B → 验证 → C → 验证 → D → 验证 → E → 验证
 
 每个批次独立 commit，CI 绿再进下一批。
+
+
+---
+
+# 交付结果（2026-10-31）
+
+CI run 41124729643 · commit 6f8943f · 编译 / 单元测试 / IPA 全绿。
+
+| 编号 | 状态 | 说明 |
+|---|---|---|
+| A1 | 完成 | delegate 移到 `App.init()` |
+| A2 | 完成 | `DeepLinkRouter` 带 repoFullName；缺数据时 `ensureRun` 补拉；失败弹提示 |
+| A3 | 完成 | generation token；旧任务不再覆盖新任务状态 |
+| A4 | 完成 | `didAutoScroll` 只滚一次 |
+| A5 | 完成 | 锚点 `step-<jobID>-<number>` |
+| A6 | 完成 | `ensureArtifacts` 打开详情时补拉 |
+| A7 | 完成 | 摘要读 `allSections`，筛选不影响 |
+| A8 | 完成 | 开关真实值 = 意愿 && 系统授权 |
+| B1 | 完成 | `diskProgress` 内存快照，启动预热 |
+| B2 | 完成 | 网络并发（4/波），落库主线程串行；`RepoFetchResult` 为 Sendable |
+| B3 | 完成 | 按最近 `nextPollAt` 计算睡眠（0.5–5s） |
+| B4 | 完成 | `.task(id: groups.count)` |
+| B5 | 完成 | `RepoOrdering.assign` 纯函数，隐藏仓库追加在后 |
+| C1 | 完成 | 加 `EditButton`，页脚文案对齐真实行为 |
+| C2 | 完成 | 恢复 swipeActions + 二次确认（`PendingAction`） |
+| C3 | 完成 | 删除 `CacheView`，设置页跳「产物」Tab |
+| C4 | 完成 | 错误条显示数量 + 重试按钮 + 按严重度选代表 |
+| C5 | 完成 | `toastToken` 防止旧定时器误清 |
+| C6 | 完成 | 登录后自动 `syncAll` + 首刷 |
+| C7 | 完成 | 角标 = 在跑仓库数（按 repoFullName 去重） |
+| D1 | 完成 | 单一 `DeepLinkRouter.shared`，旧 `pendingRunID` 通道已删 |
+| D2 | 完成 | 63 处改用 `scaledFont`，覆盖 Dynamic Type 12 档 |
+| D3 | 完成 | 卡片合并朗读 + 下载按钮输入标签 |
+| D4 | 完成 | 2 GB 上限 + LRU 淘汰到 1.6 GB |
+| D5 | 完成 | BGAppRefreshTask，仅在跑时联网 |
+| D6 | **撤回** | 自签包无 App Group entitlement，组件读不到 App 数据；交付只会永远显示占位符，故不做半成品。等有正式签名再上 |
+| D7 | 完成 | 剥离原 `.ipa` 后缀 |
+| D8 | 完成 | 删除未使用的 `Type.display` / `Type.metric` / 重复通道 |
+| E | 完成 | 新增 6 个测试文件、35 条用例（总 39 条），全部通过 |
+
+## 已知遗留（不在本轮范围）
+
+1. **主屏小组件**：受 App Group 限制，需正式签名。
+2. **远程推送**：自签无 APNs，仍依赖服务器 `buildlight-watch` 发 Bark。
+3. **历史分页**：每仓库仍只保留最近 30 条。
+4. **iOS 26 玻璃在低端机上的滚动开销**：卡片数量 < 50 时未观察到掉帧，暂不做降级。

@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import Observation
 import UIKit
 
 /// 静音音频保活。
@@ -17,6 +18,7 @@ import UIKit
 /// 只在对的时候开：有构建在跑、且 App 在后台。
 /// 没有任务时立刻停，不白耗电。
 @MainActor
+@Observable
 final class BackgroundKeepAlive {
     static let shared = BackgroundKeepAlive()
 
@@ -25,10 +27,10 @@ final class BackgroundKeepAlive {
     /// 保活启动时间，用于展示「已持续多久」。
     private(set) var startedAt: Date?
 
-    private var engine: AVAudioEngine?
-    private var player: AVAudioPlayerNode?
-    private var interruptionObserver: NSObjectProtocol?
-    private var activationRetries = 0
+    @ObservationIgnored private var engine: AVAudioEngine?
+    @ObservationIgnored private var player: AVAudioPlayerNode?
+    @ObservationIgnored private var interruptionObserver: NSObjectProtocol?
+    @ObservationIgnored private var activationRetries = 0
 
     /// 音频会话被别的 App 抢占（来电、播放器）后最多重试几次。
     private let maxActivationRetries = 3

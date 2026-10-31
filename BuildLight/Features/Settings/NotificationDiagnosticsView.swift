@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 import UserNotifications
 import UIKit
@@ -55,10 +56,24 @@ struct NotificationDiagnosticsView: View {
                     value: keepAliveText,
                     ok: BackgroundKeepAlive.shared.isKeepingAlive
                 )
+
+                if !BackgroundKeepAlive.shared.isKeepingAlive {
+                    Text(keepAliveHint)
+                        .font(Type.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 LabeledContent(
                     "上次前台刷新",
                     value: environment.monitor.lastRefreshAt?.formatted(date: .abbreviated, time: .standard) ?? "—"
                 )
+            }
+
+            Section("后台持续监控") {
+                Toggle("构建在跑时保持活跃", isOn: keepAliveBinding)
+                Text("开关在「设置 → 后台」里，这里也能直接改。")
+                    .font(Type.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section {
@@ -93,11 +108,33 @@ struct NotificationDiagnosticsView: View {
     /// 静音保活的状态。带启动时间，能看出它是不是一直挂着。
     private var keepAliveText: String {
         guard BackgroundKeepAlive.shared.isKeepingAlive else {
-            return BackgroundKeepAlive.isEnabled ? "未启动" : "已关闭"
+            return BackgroundKeepAlive.isEnabled ? "待命中" : "已关闭"
         }
         guard let start = BackgroundKeepAlive.shared.startedAt else { return "运行中" }
         let seconds = Int(Date.now.timeIntervalSince(start))
         return "运行中 · \(seconds / 60)分\(seconds % 60)秒"
+    }
+
+    /// 「待命中」不是坏了：保活只在对的时机才启动。
+    private var keepAliveHint: String {
+        guard BackgroundKeepAlive.isEnabled else {
+            return "已在「设置 → 后台 → 后台持续监控」里关闭。"
+        }
+        let running = (try? environment.context.fetchCount(
+            FetchDescriptor<RepoRecord>(predicate: #Predicate { $0.activeRunCount > 0 })
+        )) ?? 0
+
+        if running == 0 {
+            return "当前没有构建在跑，不占用后台。等有构建启动、并且你把 App 切到后台时才会开启。"
+        }
+        return "有 \(running) 个构建在跑。App 留在前台时不会开启；切到后台后会自动启动。"
+    }
+
+    private var keepAliveBinding: Binding<Bool> {
+        Binding(
+            get: { BackgroundKeepAlive.isEnabled },
+            set: { UserDefaults.standard.set($0, forKey: BackgroundKeepAlive.storageKey) }
+        )
     }
 
     private var authorizationText: String {

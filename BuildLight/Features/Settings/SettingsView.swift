@@ -8,6 +8,7 @@ struct SettingsView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.openURL) private var openURL
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.scenePhase) private var scenePhase
     @Query(sort: \RepoRecord.sortIndex) private var repos: [RepoRecord]
 
     @AppStorage(NotificationService.storageKey) private var notifyBuildEvents = true
@@ -15,6 +16,8 @@ struct SettingsView: View {
     /// 系统授权状态。开关的真实值 = 用户意愿 && 系统已授权，
     /// 否则会出现「开关显示开、但根本收不到」的谎报状态。
     @State private var notificationAuthorized = false
+    /// 主屏图标。系统是唯一事实源，这里只做镜像。
+    @State private var appIcon: AppIconOption = .current
     @State private var showingSignOutConfirmation = false
     @State private var isSyncing = false
 
@@ -34,6 +37,8 @@ struct SettingsView: View {
                     GlassSurface(level: .panel, cornerRadius: Metrics.radiusL) {
                         VStack(alignment: .leading, spacing: 14) {
                             AccentThemePicker(selection: themeBinding)
+                            GlassHairline()
+                            AppIconPicker(selection: $appIcon)
                             GlassHairline()
                             motionRow
                         }
@@ -189,7 +194,15 @@ struct SettingsView: View {
                 }
                 Button("取消", role: .cancel) {}
             }
-            .task { await refreshNotificationState() }
+            .task {
+                await refreshNotificationState()
+                appIcon = AppIconOption.current
+            }
+            .onChange(of: scenePhase) { _, phase in
+                // 从设置里改回图标后，回来要跟系统的真实状态对齐。
+                guard phase == .active else { return }
+                appIcon = AppIconOption.current
+            }
         }
     }
 

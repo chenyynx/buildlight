@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleIcons</key>
+	<dict>
+		<key>CFBundlePrimaryIcon</key>
+		<dict>
+			<key>CFBundleIconName</key>
+			<string>AppIcon</string>
+		</dict>
+		<key>CFBundleAlternateIcons</key>
+		<dict>
+			<key>AppIcon-Indigo</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>AppIcon-Indigo</string>
+			</dict>
+			<key>AppIcon-Violet</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>AppIcon-Violet</string>
+			</dict>
+			<key>AppIcon-Rose</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>AppIcon-Rose</string>
+			</dict>
+			<key>AppIcon-Teal</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>AppIcon-Teal</string>
+			</dict>
+			<key>AppIcon-Pine</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>AppIcon-Pine</string>
+			</dict>
+			<key>AppIcon-Lime</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>AppIcon-Lime</string>
+			</dict>
+			<key>AppIcon-Copper</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>AppIcon-Copper</string>
+			</dict>
+		</dict>
+	</dict>
+</dict>
+</plist>

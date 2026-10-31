@@ -21,6 +21,9 @@ targets:
     platform: iOS
     sources:
       - path: BuildLight
+        # Info.plist 由 INFOPLIST_FILE 引用，不能同时当作资源打包。
+        excludes:
+          - Info.plist
       - path: Shared
     dependencies:
       - package: ZIPFoundation
@@ -29,7 +32,10 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.example.buildlight
         PRODUCT_NAME: BuildLight
+        # 保留 Xcode 生成的键（GENERATE_INFOPLIST_FILE 会把 INFOPLIST_KEY_* 合并进来），
+        # 同时用这个文件补 CFBundleIcons —— 备用图标只能在 Info.plist 里声明。
         GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_FILE: BuildLight/Info.plist
         MARKETING_VERSION: "2.0.0"
         CURRENT_PROJECT_VERSION: "18"
         INFOPLIST_KEY_NSSupportsLiveActivities: YES
@@ -45,6 +51,9 @@ targets:
         INFOPLIST_KEY_LSApplicationQueriesSchemes: "qnq esign altstore sidestore apple-magnifier"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        # 七套彩色图标。Info.plist 的 CFBundleAlternateIcons 由 XcodeGen 的
+        # info 段生成（见下方 info.properties）。
+        ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: "AppIcon-Indigo AppIcon-Violet AppIcon-Rose AppIcon-Teal AppIcon-Pine AppIcon-Lime AppIcon-Copper"
         TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: ""

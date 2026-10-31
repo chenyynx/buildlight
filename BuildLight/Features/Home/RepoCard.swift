@@ -84,10 +84,9 @@ struct RepoCard: View {
                     tint: tone,
                     size: 20
                 )
-                Text(whenText)
+                whenView
                     .font(Type.caption)
                     .foregroundStyle(downloading ? AnyShapeStyle(accent.primary) : AnyShapeStyle(.tertiary))
-                    .monospacedDigit()
                     .lineLimit(1)
             }
         }
@@ -177,6 +176,24 @@ struct RepoCard: View {
         if let workflow = repo.latestWorkflowName, !workflow.isEmpty { parts.append(workflow) }
         if let branch = repo.latestBranch, !branch.isEmpty { parts.append(branch) }
         return parts.joined(separator: " · ")
+    }
+
+    /// 「多久以前」必须自己更新，否则切回前台会一直停在旧文案上。
+    @ViewBuilder
+    private var whenView: some View {
+        if downloading, let target,
+           let speed = environment.packages.speed(for: target.id),
+           let text = ByteRate.text(speed) {
+            Text(text)
+        } else if let started = repo.latestStartedAt {
+            if repo.isRunning {
+                Text(started.formatted(date: .omitted, time: .shortened) + " 开始")
+            } else {
+                RelativeTimeText(date: repo.latestRunAt ?? started)
+            }
+        } else {
+            Text(repo.latestRunAt == nil ? "—" : "等待 runner")
+        }
     }
 
     private var whenText: String {

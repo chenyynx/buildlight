@@ -24,10 +24,9 @@ struct PackageEntryCard: View {
                         Text(entry.fileName)
                             .scaledFont(size: 15, weight: .semibold)
                             .lineLimit(1)
-                        Text(detail)
+                        detailView
                             .scaledFont(size: 12)
                             .foregroundStyle(.secondary)
-                            .monospacedDigit()
                             .lineLimit(1)
                     }
 
@@ -65,8 +64,13 @@ struct PackageEntryCard: View {
         environment.cache.url(for: entry.id) ?? URL(fileURLWithPath: "/dev/null")
     }
 
-    private var detail: String {
+    @ViewBuilder
+    private var detailView: some View {
         let size = ByteCountFormatter.string(fromByteCount: entry.size, countStyle: .file)
-        return "\(size) · \(RelativeTime.text(for: entry.savedAt))下载"
+        HStack(spacing: 4) {
+            Text(size)
+            Text("·")
+            RelativeTimeText(date: entry.savedAt, suffix: "下载")
+        }
     }
 }

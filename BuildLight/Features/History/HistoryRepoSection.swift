@@ -57,10 +57,7 @@ struct HistoryRepoSection: View {
                         .foregroundStyle(.primary)
                         .lineLimit(1)
 
-                    Text(subtitle)
-                        .font(Type.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                    subtitleView
                 }
 
                 Spacer(minLength: 8)
@@ -108,11 +105,23 @@ struct HistoryRepoSection: View {
         run.conclusion == .failure || run.conclusion == .timedOut
     }
 
-    private var subtitle: String {
-        guard let latest else { return "暂无记录" }
-        var parts: [String] = []
-        if let workflow = latest.workflowName, !workflow.isEmpty { parts.append(workflow) }
-        parts.append(RelativeTime.text(for: latest.createdAt))
-        return parts.joined(separator: " · ")
+    @ViewBuilder
+    private var subtitleView: some View {
+        if let latest {
+            HStack(spacing: 4) {
+                if let workflow = latest.workflowName, !workflow.isEmpty {
+                    Text(workflow)
+                    Text("·")
+                }
+                RelativeTimeText(date: latest.createdAt)
+            }
+            .font(Type.caption)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+        } else {
+            Text("暂无记录")
+                .font(Type.caption)
+                .foregroundStyle(.secondary)
+        }
     }
 }

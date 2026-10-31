@@ -22,9 +22,7 @@ struct HomeHeroPanel: View {
                             .font(Type.headline)
                             .tracking(-0.4)
                             .foregroundStyle(.primary)
-                        Text(subheadline)
-                            .font(Type.label)
-                            .foregroundStyle(.secondary)
+                        subheadlineView
                     }
                     Spacer(minLength: 0)
                 }
@@ -51,11 +49,20 @@ struct HomeHeroPanel: View {
         return "一切正常"
     }
 
-    private var subheadline: String {
+    @ViewBuilder
+    private var subheadlineView: some View {
         if let lastRefresh {
-            return "更新于 " + RelativeTime.text(for: lastRefresh)
+            HStack(spacing: 4) {
+                Text("更新于")
+                RelativeTimeText(date: lastRefresh)
+            }
+            .font(Type.label)
+            .foregroundStyle(.secondary)
+        } else {
+            Text("尚未刷新")
+                .font(Type.label)
+                .foregroundStyle(.secondary)
         }
-        return "尚未刷新"
     }
 }
 

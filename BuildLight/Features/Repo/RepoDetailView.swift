@@ -116,7 +116,16 @@ struct RepoDetailView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
-            ScreenHeader(title: repo.displayName, subtitle: headerSubtitle)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(repo.displayName)
+                    .font(.system(size: 26, weight: .bold))
+                    .tracking(-0.6)
+                    .lineLimit(2)
+                headerSubtitleView
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, DS.pad)
+            .padding(.top, 10)
 
             GlassSurface(level: .panel, cornerRadius: Metrics.radiusL) {
                 HStack(spacing: 0) {
@@ -142,12 +151,26 @@ struct RepoDetailView: View {
         }
     }
 
-    private var headerSubtitle: String {
-        var parts: [String] = []
-        if let workflow = repo.workflowFilter, !workflow.isEmpty { parts.append(workflow) }
-        if let branch = repo.latestBranch, !branch.isEmpty { parts.append(branch) }
-        if let at = repo.latestRunAt { parts.append("最近 " + RelativeTime.text(for: at)) }
-        return parts.joined(separator: " · ")
+    /// 「最近 N 分钟前」会自己走，不需要重新进页面。
+    @ViewBuilder
+    private var headerSubtitleView: some View {
+        HStack(spacing: 4) {
+            if let workflow = repo.workflowFilter, !workflow.isEmpty {
+                Text(workflow)
+                Text("·")
+            }
+            if let branch = repo.latestBranch, !branch.isEmpty {
+                Text(branch)
+                Text("·")
+            }
+            if let at = repo.latestRunAt {
+                Text("最近")
+                RelativeTimeText(date: at)
+            }
+        }
+        .font(.system(size: 12.5))
+        .foregroundStyle(.secondary)
+        .lineLimit(2)
     }
 
     private var successCount: Int {

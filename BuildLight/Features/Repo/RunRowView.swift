@@ -26,7 +26,7 @@ struct RunRowView: View {
                     .scaledFont(size: 13, weight: .medium)
                     .monospacedDigit()
                     .foregroundStyle(tone ?? .secondary)
-                Text(whenText)
+                whenView
                     .scaledFont(size: 11)
                     .foregroundStyle(.tertiary)
             }
@@ -80,9 +80,13 @@ struct RunRowView: View {
         }
     }
 
-    private var whenText: String {
-        if run.isActive { return run.status.label }
-        return RelativeTime.text(for: run.createdAt)
+    @ViewBuilder
+    private var whenView: some View {
+        if run.isActive {
+            Text(run.status.label)
+        } else {
+            RelativeTimeText(date: run.createdAt)
+        }
     }
 
     private var isFailed: Bool {

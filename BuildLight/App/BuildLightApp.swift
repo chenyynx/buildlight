@@ -60,6 +60,8 @@ struct RootView: View {
             // CoreLocation 的初始化会同步走一次 locationd IPC，
             // 只能放在 Scene 建立之后，不能塞进 App.init 的启动关键路径。
             LocationKeepAlive.shared.configure()
+            // 相对时间（「3 分钟前」）不会自己走，靠这个时钟推。
+            AppClock.shared.start()
             await environment.session.refreshIdentityIfNeeded()
             await NotificationService.shared.prepareIfNeeded()
             // 冷启动时 scenePhase 初始就是 .active，onChange 不会触发。
@@ -75,6 +77,7 @@ struct RootView: View {
                 guard environment.session.isSignedIn else { return }
                 BackgroundExecutionKeeper.shared.end()
                 BackgroundKeepAlive.shared.verifyStillRunning()
+                AppClock.shared.tickNow()
                 environment.monitor.start()
                 // 回前台立刻全量刷一遍：挂起期间数据是旧的，
                 // 用户第一眼看到的必须是真实状态，而不是几秒前的快照。

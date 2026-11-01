@@ -86,6 +86,7 @@ struct RootView: View {
                 BackgroundExecutionKeeper.shared.end()
                 BackgroundKeepAlive.shared.verifyStillRunning()
                 AppClock.shared.tickNow()
+                SecondClock.shared.tickNow()
                 // start() 是幂等的：循环要是因为任何原因停了，这里能把它拉回来。
                 environment.monitor.start()
                 // 回前台立刻全量刷一遍：挂起期间数据是旧的，

@@ -403,7 +403,7 @@ final class BuildMonitor {
                 id: latest.id,
                 at: latest.updatedAt,
                 completed: latest.completedAt,
-                started: latest.startedAt,
+                started: latest.trustedStart(),
                 status: latest.statusRaw,
                 conclusion: latest.conclusionRaw,
                 branch: latest.branch,

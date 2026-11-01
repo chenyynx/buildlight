@@ -78,6 +78,11 @@ final class RunRecord {
     var startedAt: Date?
     /// 真正的结束时刻。老记录这一列为空时回落到 updatedAt。
     var completedAt: Date?
+    /// 本机第一次看到它处于「进行中」的时刻。
+    /// GitHub 返回的 startedAt 偶尔会因为 runner 时钟跑飞落到未来
+    /// （chenyynx/Agents-Anywhere 实测差 57 分钟），这时候拿它当起点的
+    /// 计时器会永远停在 0:00。用这个本机时间兜底。
+    var observedRunningAt: Date?
     var updatedAt: Date
     var htmlURL: URL
     var actorLogin: String?
@@ -110,6 +115,27 @@ final class RunRecord {
     var conclusion: RunConclusion { RunConclusion(raw: conclusionRaw) }
     var isActive: Bool { status.isActive }
 
+    /// 可信的起始时刻。
+    ///
+    /// `startedAt` 明显在未来（> 2 分钟）说明远端时钟不可信，
+    /// 退回到本机第一次看到它跑起来的时刻，宁可少算也不要卡在 0:00。
+    func trustedStart(now: Date = .now) -> Date? {
+        guard let startedAt else { return observedRunningAt }
+        if startedAt > now.addingTimeInterval(120) {
+            return observedRunningAt ?? now
+        }
+        return startedAt
+    }
+
+    /// 本次运行的耗时（秒）。时间戳自相矛盾时返回 nil，界面显示「—」，
+    /// 不要把 75:42 这种根本不存在的时间摆给用户看。
+    func elapsed(now: Date = .now) -> TimeInterval? {
+        guard let start = trustedStart(now: now) else { return nil }
+        let end: Date = isActive ? now : (completedAt ?? updatedAt)
+        let value = end.timeIntervalSince(start)
+        return value >= 0 ? value : nil
+    }
+
     func apply(_ run: WorkflowRun) {
         workflowName = run.name
         branch = run.headBranch
@@ -121,6 +147,9 @@ final class RunRecord {
         conclusionRaw = run.conclusionRaw
         startedAt = run.runStartedAt
         completedAt = run.completedAt
+        if status.isActive, observedRunningAt == nil {
+            observedRunningAt = .now
+        }
         updatedAt = run.updatedAt
         htmlURL = run.htmlUrl
         actorLogin = run.actor?.login

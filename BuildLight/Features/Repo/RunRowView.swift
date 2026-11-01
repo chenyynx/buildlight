@@ -71,12 +71,14 @@ struct RunRowView: View {
     /// 运行中用系统计时文本，前后台切换后仍然准确。
     @ViewBuilder
     private var durationText: some View {
-        if run.isActive, let start = run.startedAt {
-            Text(timerInterval: start...Date.distantFuture, countsDown: false)
-        } else if let start = run.startedAt {
-            Text(RepoDurationText.clock(from: start, to: run.completedAt ?? run.updatedAt))
+        if run.isActive, let start = run.trustedStart() {
+            ElapsedTimeText(start: start)
+        } else if run.isActive {
+            Text(run.startedAt == nil ? "排队" : "运行中")
+        } else if let seconds = run.elapsed() {
+            Text(RepoDurationText.clock(seconds: seconds))
         } else {
-            Text(run.isActive ? "排队" : "—")
+            Text("—")
         }
     }
 

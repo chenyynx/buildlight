@@ -158,22 +158,20 @@ struct RunDetailView: View {
                 .lineLimit(3)
                 .padding(.top, 2)
 
-            if run.isActive, let start = run.startedAt {
+            if run.isActive, let start = run.trustedStart() {
                 durationLine {
-                    Text(timerInterval: start...Date.distantFuture, countsDown: false)
-                        .monospacedDigit()
+                    ElapsedTimeText(start: start)
                 }
             } else if run.isActive {
-                // 排队中：还没有 startedAt，用创建时间起算，但只是静态显示
                 durationLine {
-                    Text(RepoDurationText.clock(from: run.createdAt, to: .now))
-                        .monospacedDigit()
+                    Text(run.startedAt == nil ? "排队中" : "运行中")
+                }
+            } else if let seconds = run.elapsed() {
+                durationLine {
+                    Text(RepoDurationText.clock(seconds: seconds))
                 }
             } else {
-                durationLine {
-                    Text(RepoDurationText.clock(from: run.startedAt ?? run.createdAt, to: run.completedAt ?? run.updatedAt))
-                        .monospacedDigit()
-                }
+                durationLine { Text("—") }
             }
         }
         .padding(.horizontal, DS.pad)

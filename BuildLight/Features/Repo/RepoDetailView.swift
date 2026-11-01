@@ -163,7 +163,7 @@ struct RepoDetailView: View {
                 Text(branch)
                 Text("·")
             }
-            if let at = repo.latestRunAt {
+            if let at = repo.latestCompletedAt ?? repo.latestRunAt {
                 Text("最近")
                 RelativeTimeText(date: at)
             }

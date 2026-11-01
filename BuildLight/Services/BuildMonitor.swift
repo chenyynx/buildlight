@@ -18,6 +18,10 @@ final class BuildMonitor {
 
     var errors: [String: AppError] { issues.activeErrors }
     private(set) var isRefreshing = false
+    /// 刷新期间又被要求刷新一次（前台 + 轮询撞在一起）。
+    private var refreshAgainRequested = false
+    /// 轮询循环是否活着，诊断页用。
+    var isLoopRunning: Bool { loop != nil }
     private(set) var lastRefreshAt: Date?
     private var pausedUntil: Date?
     /// 第一次见到某个仓库时不发通知，否则刚装 App 会把历史失败全推一遍。
@@ -52,7 +56,9 @@ final class BuildMonitor {
                 // 按「下一个仓库什么时候到期」决定睡多久。
                 // 固定 1 秒会在全空闲时也每秒唤醒，白白耗电。
                 let interval = await self.nextSleepInterval()
-                try? await Task.sleep(for: .seconds(interval))
+                // 取消时真正退出循环：`try?` 会把 CancellationError 吞掉，
+                // 循环就永远转下去了（stop() 变成摆设）。
+                do { try await Task.sleep(for: .seconds(interval)) } catch { return }
             }
         }
     }
@@ -91,17 +97,20 @@ final class BuildMonitor {
             .prefix(maxReposPerTick)
         guard !due.isEmpty else { return }
 
+        let repos = Array(due)
+        for repo in repos {
+            nextPollAt[repo.fullName] = now.addingTimeInterval(activeInterval)
+        }
+        await fetch(repos, client: client)
+    }
+
+    /// 并发拉取并落库。调用方负责设置 `nextPollAt`。
+    private func fetch(_ repos: [RepoRecord], client: GitHubClient) async {
+        guard !repos.isEmpty else { return }
         isRefreshing = true
         defer {
             isRefreshing = false
             lastRefreshAt = .now
-        }
-
-        // 网络请求并发跑（上限 4），落库仍然回到主线程串行。
-        // 之前是一个接一个 await，21 个仓库刷新要等 21 个 RTT 累加。
-        let repos = Array(due)
-        for repo in repos {
-            nextPollAt[repo.fullName] = now.addingTimeInterval(activeInterval)
         }
 
         // 按「波」并发拉数据，落库仍然在主线程串行。
@@ -139,6 +148,9 @@ final class BuildMonitor {
                 guard let repo = byName[result.fullName] else { continue }
                 apply(result, to: repo)
             }
+            // 显式落盘：应用被挂起/杀掉时，autosave 不一定来得及跑，
+            // 下次打开就是旧数据。
+            try? context.save()
             index = end
         }
     }
@@ -150,20 +162,44 @@ final class BuildMonitor {
     }
 
     func refreshNow() async {
-        nextPollAt.removeAll()
         await refreshAll()
     }
 
-    /// 回到前台时用：把所有仓库都刷一遍，而不是每轮只刷 6 个。
-    /// 否则刚回来那几秒里，已经结束的构建还会显示成「进行中」，计时器继续走。
+    /// 全量刷新：回到前台、下拉、点刷新都走这里。
+    ///
+    /// 老实现是「循环调 tick()」，而 tick() 每次只取前 12 个到期仓库、
+    /// 并且把 nextPollAt 推到 3 秒后——第二轮立刻判定「没有到期的」直接退出。
+    /// 结果：仓库多于 12 个时，回前台只刷了前 12 个，其余全是旧数据。
+    /// 现在改成**显式全量**，不受 nextPollAt 影响。
     func refreshAll() async {
-        nextPollAt.removeAll()
-        for _ in 0..<5 {
-            let all = (try? context.fetch(FetchDescriptor<RepoRecord>())) ?? []
-            let now = Date()
-            let pending = all.filter { !$0.isHidden && (nextPollAt[$0.fullName] ?? .distantPast) <= now }
-            if pending.isEmpty { break }
-            await tick()
+        guard let client = session.client else { return }
+
+        // 已有刷新在跑：记一笔，等它结束后再补一轮，避免两份请求互相覆盖。
+        if isRefreshing {
+            refreshAgainRequested = true
+            return
+        }
+
+        if let pausedUntil, Date() < pausedUntil { return }
+
+        let all = (try? context.fetch(FetchDescriptor<RepoRecord>())) ?? []
+        let targets = all.filter { !$0.isHidden }
+        guard !targets.isEmpty else {
+            lastRefreshAt = .now
+            return
+        }
+
+        // 把到期时间推开，免得轮询循环紧接着又刷同一批。
+        let now = Date()
+        for repo in targets {
+            nextPollAt[repo.fullName] = now.addingTimeInterval(activeInterval)
+        }
+
+        await fetch(targets, client: client)
+
+        if refreshAgainRequested {
+            refreshAgainRequested = false
+            await refreshAll()
         }
     }
 
@@ -366,6 +402,7 @@ final class BuildMonitor {
             let snapshot = (
                 id: latest.id,
                 at: latest.updatedAt,
+                completed: latest.completedAt,
                 started: latest.startedAt,
                 status: latest.statusRaw,
                 conclusion: latest.conclusionRaw,
@@ -376,6 +413,7 @@ final class BuildMonitor {
             )
             if repo.latestRunID != snapshot.id
                 || repo.latestRunAt != snapshot.at
+                || repo.latestCompletedAt != snapshot.completed
                 || repo.latestStatusRaw != snapshot.status
                 || repo.latestConclusionRaw != snapshot.conclusion
                 || repo.activeRunCount != snapshot.active {
@@ -383,6 +421,7 @@ final class BuildMonitor {
             }
             repo.latestRunID = snapshot.id
             repo.latestRunAt = snapshot.at
+            repo.latestCompletedAt = snapshot.completed
             repo.latestStartedAt = snapshot.started
             repo.latestStatusRaw = snapshot.status
             repo.latestConclusionRaw = snapshot.conclusion

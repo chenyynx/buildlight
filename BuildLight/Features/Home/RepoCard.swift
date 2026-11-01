@@ -189,7 +189,7 @@ struct RepoCard: View {
             if repo.isRunning {
                 Text(started.formatted(date: .omitted, time: .shortened) + " 开始")
             } else {
-                RelativeTimeText(date: repo.latestRunAt ?? started)
+                RelativeTimeText(date: repo.latestCompletedAt ?? repo.latestRunAt ?? started)
             }
         } else {
             Text(repo.latestRunAt == nil ? "—" : "等待 runner")
@@ -208,7 +208,7 @@ struct RepoCard: View {
         if repo.isRunning {
             return started.formatted(date: .omitted, time: .shortened) + " 开始"
         }
-        return RelativeTime.text(for: repo.latestRunAt ?? started)
+        return RelativeTime.text(for: repo.latestCompletedAt ?? repo.latestRunAt ?? started)
     }
 
     private var tone: Color? {

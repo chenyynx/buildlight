@@ -74,7 +74,7 @@ struct RunRowView: View {
         if run.isActive, let start = run.startedAt {
             Text(timerInterval: start...Date.distantFuture, countsDown: false)
         } else if let start = run.startedAt {
-            Text(RepoDurationText.clock(from: start, to: run.updatedAt))
+            Text(RepoDurationText.clock(from: start, to: run.completedAt ?? run.updatedAt))
         } else {
             Text(run.isActive ? "排队" : "—")
         }

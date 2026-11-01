@@ -171,7 +171,7 @@ struct RunDetailView: View {
                 }
             } else {
                 durationLine {
-                    Text(RepoDurationText.clock(from: run.startedAt ?? run.createdAt, to: run.updatedAt))
+                    Text(RepoDurationText.clock(from: run.startedAt ?? run.createdAt, to: run.completedAt ?? run.updatedAt))
                         .monospacedDigit()
                 }
             }

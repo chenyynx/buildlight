@@ -68,10 +68,23 @@ struct NotificationDiagnosticsView: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                LabeledContent(
-                    "上次前台刷新",
-                    value: environment.monitor.lastRefreshAt?.formatted(date: .abbreviated, time: .standard) ?? "—"
+                diagnosticRow(
+                    "轮询循环",
+                    value: environment.monitor.isLoopRunning ? "运行中" : "已停止",
+                    ok: environment.monitor.isLoopRunning
                 )
+                diagnosticRow(
+                    "正在刷新",
+                    value: environment.monitor.isRefreshing ? "是" : "否",
+                    ok: true
+                )
+                if let at = environment.monitor.lastRefreshAt {
+                    LabeledContent("上次刷新") {
+                        RelativeTimeText(date: at, suffix: "前")
+                    }
+                } else {
+                    LabeledContent("上次刷新", value: "—")
+                }
             }
 
             Section("后台持续监控") {

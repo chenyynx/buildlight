@@ -84,6 +84,10 @@ struct WorkflowRun: Decodable, Identifiable, Hashable, Sendable {
     let conclusionRaw: String?
     let createdAt: Date
     let runStartedAt: Date?
+    /// GitHub 的 `completed_at`：真正结束的时刻。
+    /// **不能用 `updated_at` 代替**——产物上传、重跑都会把 updated_at 推后，
+    /// 拿它减 started_at 会算出 75 分钟这种根本不存在的耗时。
+    let completedAt: Date?
     let updatedAt: Date
     let htmlUrl: URL
     let workflowId: Int?
@@ -110,6 +114,7 @@ struct WorkflowRun: Decodable, Identifiable, Hashable, Sendable {
         case conclusionRaw = "conclusion"
         case createdAt = "created_at"
         case runStartedAt = "run_started_at"
+        case completedAt = "completed_at"
         case updatedAt = "updated_at"
         case htmlUrl = "html_url"
         case workflowId = "workflow_id"

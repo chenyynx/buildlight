@@ -23,6 +23,8 @@ final class RepoRecord {
     // 卡片只读这些标量，不再每帧去遍历关系数组、排序、查磁盘。
     var latestRunAt: Date?
     var latestStartedAt: Date?
+    /// 最近一次运行真正结束的时间（卡片上的「x 分钟前」用它）。
+    var latestCompletedAt: Date?
     var latestStatusRaw: String = ""
     var latestConclusionRaw: String?
     var latestBranch: String?
@@ -74,6 +76,8 @@ final class RunRecord {
     var conclusionRaw: String?
     var createdAt: Date
     var startedAt: Date?
+    /// 真正的结束时刻。老记录这一列为空时回落到 updatedAt。
+    var completedAt: Date?
     var updatedAt: Date
     var htmlURL: URL
     var actorLogin: String?
@@ -96,6 +100,7 @@ final class RunRecord {
         self.conclusionRaw = run.conclusionRaw
         self.createdAt = run.createdAt
         self.startedAt = run.runStartedAt
+        self.completedAt = run.completedAt
         self.updatedAt = run.updatedAt
         self.htmlURL = run.htmlUrl
         self.actorLogin = run.actor?.login
@@ -115,6 +120,7 @@ final class RunRecord {
         statusRaw = run.statusRaw
         conclusionRaw = run.conclusionRaw
         startedAt = run.runStartedAt
+        completedAt = run.completedAt
         updatedAt = run.updatedAt
         htmlURL = run.htmlUrl
         actorLogin = run.actor?.login
@@ -134,6 +140,7 @@ final class RunRecord {
             conclusionRaw: conclusionRaw,
             createdAt: createdAt,
             runStartedAt: startedAt,
+            completedAt: completedAt,
             updatedAt: updatedAt,
             htmlUrl: htmlURL,
             workflowId: nil,

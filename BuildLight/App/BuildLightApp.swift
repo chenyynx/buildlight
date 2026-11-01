@@ -71,17 +71,26 @@ struct RootView: View {
             BackgroundRefresh.shared.schedule()
             await environment.monitor.refreshAll()
         }
-        .onChange(of: scenePhase) { _, phase in
+        // 刚登录完：`.task` 早就跑完了，轮询循环没人启动——
+        // 于是「登录进来一直不刷新，要手动下拉」。
+        .onChange(of: environment.session.isSignedIn) { _, signedIn in
+            guard signedIn else { return }
+            environment.monitor.start()
+            BackgroundRefresh.shared.schedule()
+            Task { await environment.monitor.refreshAll() }
+        }
+        .onChange(of: scenePhase) { [scenePhase] _, phase in
             switch phase {
             case .active:
                 guard environment.session.isSignedIn else { return }
                 BackgroundExecutionKeeper.shared.end()
                 BackgroundKeepAlive.shared.verifyStillRunning()
                 AppClock.shared.tickNow()
+                // start() 是幂等的：循环要是因为任何原因停了，这里能把它拉回来。
                 environment.monitor.start()
                 // 回前台立刻全量刷一遍：挂起期间数据是旧的，
                 // 用户第一眼看到的必须是真实状态，而不是几秒前的快照。
-                Task { await environment.monitor.refreshAll() }
+                Task { await environment.monitor.refreshNow() }
             case .background:
                 guard environment.session.isSignedIn else { return }
                 // 两件事一起做：

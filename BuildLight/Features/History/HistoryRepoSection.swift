@@ -113,7 +113,7 @@ struct HistoryRepoSection: View {
                     Text(workflow)
                     Text("·")
                 }
-                RelativeTimeText(date: latest.createdAt)
+                RelativeTimeText(date: latest.completedAt ?? latest.createdAt)
             }
             .font(Type.caption)
             .foregroundStyle(.secondary)
